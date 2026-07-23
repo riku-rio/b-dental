@@ -1,36 +1,29 @@
-"""B-Dental Blender extension foundation."""
+"""B-Dental Blender extension registration entry point."""
 
 import bpy
+from bpy.props import PointerProperty
 
+from . import operators, properties, ui
 
-class BDENTAL_PT_foundation(bpy.types.Panel):
-    """Display the initial B-Dental placeholder interface."""
-
-    bl_idname = "BDENTAL_PT_foundation"
-    bl_label = "B-Dental"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
-    bl_category = "B-Dental"
-
-    def draw(self, context: bpy.types.Context) -> None:
-        del context
-        self.layout.label(text="Not Implemented Yet.")
-
-
-CLASSES = (
-    BDENTAL_PT_foundation,
-)
+CLASSES = properties.CLASSES + operators.CLASSES + ui.CLASSES
 
 
 def register() -> None:
-    """Register B-Dental classes with Blender."""
+    """Register B-Dental classes and scene-persistent workflow state."""
 
     for cls in CLASSES:
         bpy.utils.register_class(cls)
 
+    bpy.types.Scene.bdental_workflow = PointerProperty(
+        type=properties.BDENTAL_PG_WorkflowState
+    )
+
 
 def unregister() -> None:
-    """Unregister B-Dental classes from Blender."""
+    """Remove scene state and unregister B-Dental classes in reverse order."""
+
+    if hasattr(bpy.types.Scene, "bdental_workflow"):
+        del bpy.types.Scene.bdental_workflow
 
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)
