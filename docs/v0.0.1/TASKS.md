@@ -5,7 +5,7 @@
 - [x] V001-001 Define the v0.0.1 product requirements.
 - [x] V001-002 Record the extension foundation implementation plan.
 - [x] V001-003 Record the initial Blender UI entry-point decision.
-- [ ] V001-004 Review and approve the v0.0.1 documentation set.
+- [x] V001-004 Review and approve the v0.0.1 documentation set.
 
 ## Project Structure
 
