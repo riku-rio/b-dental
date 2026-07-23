@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
 
 id = "b_dental"
-version = "0.0.2"
+version = "0.0.3"
 name = "B-Dental"
-tagline = "Import and validate dental STL scan sets"
+tagline = "Import scans and verify dental occlusion workflows"
 maintainer = "riku-rio"
 type = "add-on"
 website = "https://github.com/riku-rio/b-dental"
@@ -20,9 +20,13 @@ files = "Import intra-oral STL scans selected by the user"
 [build]
 paths = [
   "__init__.py",
+  "alignment.py",
+  "occlusion_validation.py",
   "operators.py",
   "properties.py",
   "scene_utils.py",
+  "step_two_operators.py",
+  "step_two_session.py",
   "ui.py",
   "validation.py",
 ]
