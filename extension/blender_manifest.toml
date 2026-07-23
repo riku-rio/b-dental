@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
 
 id = "b_dental"
-version = "0.0.3"
+version = "0.0.4"
 name = "B-Dental"
-tagline = "Import scans and verify dental occlusion workflows"
+tagline = "Import scans, verify occlusion, and define a manual crown margin"
 maintainer = "riku-rio"
 type = "add-on"
 website = "https://github.com/riku-rio/b-dental"
@@ -21,10 +21,15 @@ files = "Import intra-oral STL scans selected by the user"
 paths = [
   "__init__.py",
   "alignment.py",
+  "margin_geometry.py",
+  "margin_validation.py",
   "occlusion_validation.py",
   "operators.py",
   "properties.py",
+  "restoration_utils.py",
   "scene_utils.py",
+  "step_three_operators.py",
+  "step_three_session.py",
   "step_two_operators.py",
   "step_two_session.py",
   "ui.py",
