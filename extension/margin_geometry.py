@@ -31,21 +31,20 @@ def deserialize_points(value: str) -> tuple[Vector, ...]:
         return ()
     try:
         payload = json.loads(value)
-        points = tuple(Vector((float(item[0]), float(item[1]), float(item[2]))) for item in payload)
+        return tuple(
+            Vector((float(item[0]), float(item[1]), float(item[2])))
+            for item in payload
+        )
     except (TypeError, ValueError, IndexError, json.JSONDecodeError):
         return ()
-    return points
 
 
 def curve_points(obj: bpy.types.Object | None) -> tuple[Vector, ...]:
     if not scene_utils.object_is_alive(obj) or obj.type != "CURVE" or obj.data is None:
         return ()
-    if len(obj.data.splines) != 1:
+    if len(obj.data.splines) != 1 or obj.data.splines[0].type != "POLY":
         return ()
-    spline = obj.data.splines[0]
-    if spline.type != "POLY":
-        return ()
-    return tuple(Vector(point.co[:3]) for point in spline.points)
+    return tuple(Vector(point.co[:3]) for point in obj.data.splines[0].points)
 
 
 def curve_is_cyclic(obj: bpy.types.Object | None) -> bool:
@@ -80,15 +79,15 @@ def replace_curve_points(
     spline.use_cyclic_u = bool(cyclic)
 
 
-def ensure_margin_object(scene: bpy.types.Scene, state) -> bpy.types.Object:
-    target = restoration_utils.target_scan(state)
+def ensure_margin_object(scene: bpy.types.Scene, state, restoration) -> bpy.types.Object:
+    target = restoration_utils.target_scan(state, restoration)
     if target is None:
         raise ValueError("The target preparation scan is unavailable.")
 
-    obj = restoration_utils.resolve_margin(state)
+    obj = restoration_utils.resolve_margin(restoration)
     if obj is None:
         curve = bpy.data.curves.new(
-            f"BDENTAL_Margin_{state.target_tooth_fdi}_Curve",
+            f"BDENTAL_Margin_{restoration.target_tooth_fdi}_{restoration.restoration_id[:8]}_Curve",
             type="CURVE",
         )
         curve.dimensions = "3D"
@@ -96,23 +95,22 @@ def ensure_margin_object(scene: bpy.types.Scene, state) -> bpy.types.Object:
         curve.bevel_depth = 0.00015
         curve.bevel_resolution = 2
         obj = bpy.data.objects.new(
-            f"BDENTAL_Margin_{state.target_tooth_fdi}",
+            f"BDENTAL_Margin_{restoration.target_tooth_fdi}_{restoration.restoration_id[:8]}",
             curve,
         )
         restoration_utils.move_to_restoration_collection(obj, scene)
-        state.margin_object = obj
+        restoration.margin_object = obj
 
     obj.parent = target
     obj.matrix_parent_inverse = Matrix.Identity(4)
     obj.matrix_basis = Matrix.Identity(4)
     obj.hide_viewport = False
-    restoration_utils.tag_margin(obj, state)
+    restoration_utils.tag_margin(obj, restoration)
     return obj
 
 
 def append_curve_point(obj: bpy.types.Object, point: Vector) -> None:
-    points = curve_points(obj)
-    replace_curve_points(obj, (*points, point.copy()), cyclic=False)
+    replace_curve_points(obj, (*curve_points(obj), point.copy()), cyclic=False)
 
 
 def remove_last_curve_point(obj: bpy.types.Object) -> bool:
@@ -204,10 +202,7 @@ def point_surface_distances(
             distance=1000.0,
             depsgraph=depsgraph,
         )
-        if not result:
-            distances.append(float("inf"))
-        else:
-            distances.append((point - location).length)
+        distances.append((point - location).length if result else float("inf"))
     return tuple(float(value) for value in distances)
 
 
