@@ -3,99 +3,52 @@
 ## Metadata
 
 - **Version:** v0.0.2
-- **Status:** Proposed
+- **Status:** Accepted and Implemented
 - **Related requirements:** [`../PRD.md`](../PRD.md)
 - **Related plan:** [`../plans/0001-scan-import-workflow.md`](../plans/0001-scan-import-workflow.md)
 
-## Context
-
-B-Dental must support importing either one scan or a common multi-scan set. Generic STL import provides files and objects but does not identify their dental purpose. The workflow needs deterministic role assignment for upper jaw, lower jaw, right bite, and left bite.
-
-A generic list of imported files would make validation and later dental operations ambiguous. Automatic filename or geometry classification is not reliable enough to be authoritative in this milestone.
-
 ## Decision
 
-B-Dental will use four fixed role slots:
+B-Dental uses four fixed role slots:
 
 - Upper Jaw.
 - Lower Jaw.
 - Right Bite.
 - Left Bite.
 
-The user will choose one of three scan configurations:
+Supported configurations:
 
-- `Single Arch`: upper jaw or lower jaw is required.
-- `Dual Arch`: upper jaw and lower jaw are required.
-- `Full Scan Set`: upper jaw, lower jaw, right bite, and left bite are required.
+- `Single Arch`: upper or lower jaw.
+- `Dual Arch`: upper and lower jaw.
+- `Full Scan Set`: upper jaw, lower jaw, right bite, and left bite.
 
-Each displayed role slot will own its import, replace, remove, focus, and visibility actions. Every populated slot will point to one Blender mesh object and that object will be tagged with matching B-Dental role metadata.
+Each slot owns its import, replace, remove, focus, and visibility actions. Every populated slot points to one Blender mesh object carrying matching B-Dental role metadata.
 
 ## Rationale
 
-Fixed slots:
+Fixed roles make missing scans visible, keep validation deterministic, prevent ambiguous assignments, and provide stable inputs for later dental workflow stages.
 
-- Match the known workflow requirements.
-- Make missing scans immediately visible.
-- Make validation rules simple and deterministic.
-- Prevent duplicate or ambiguous assignments.
-- Create stable inputs for later alignment and dental processing steps.
-- Fit the existing sidebar without requiring a complex collection editor.
+## Rejected or Deferred Alternatives
 
-## Alternatives Considered
+- Generic imported-scan collections.
+- Automatic filename assignment without confirmation.
+- Geometry-based role classification.
+- Requiring all four scans in every case.
+- Bulk assignment UI.
 
-### Generic Collection of Imported Scans
+## Implementation Result
 
-A collection supports arbitrary file counts but does not communicate required dental roles clearly and complicates validation.
+The decision was implemented in `properties.py`, `scene_utils.py`, `operators.py`, `validation.py`, and `ui.py`.
 
-**Decision:** Rejected for v0.0.2.
+Local verification confirmed:
 
-### Multi-File Import with Automatic Filename Assignment
+- Each configuration displays and requires the correct roles.
+- A slot contains at most one object.
+- One object cannot occupy multiple roles.
+- Managed metadata matches the assigned role.
+- Replacement is transactional.
+- Configuration changes invalidate prior Step 1 success.
 
-This could improve speed, but scanner naming conventions vary and filename inference can be wrong.
+## Completion Record
 
-**Decision:** Deferred as a convenience feature. Suggestions may be added later but must require user confirmation.
-
-### Geometry-Based Automatic Classification
-
-Classifying arches and bite scans from geometry is outside this milestone and would require substantially more domain logic and testing.
-
-**Decision:** Deferred.
-
-### Require All Four Scans in Every Case
-
-This is simple but excludes legitimate single-arch and dual-arch cases.
-
-**Decision:** Rejected.
-
-## Consequences
-
-### Positive
-
-- The interface and validation are predictable.
-- Later steps can refer to stable role names.
-- Single and multiple scan workflows use one model.
-- Object pointers can remain simple scene properties.
-
-### Limitations
-
-- Arbitrary additional scans are not represented.
-- Repeated scans for the same role are not retained as history.
-- Batch import is not included in this milestone.
-
-## Implementation Constraints
-
-- A slot may point to at most one object.
-- One object may not occupy more than one slot.
-- Managed objects must carry role metadata matching their assigned slot.
-- Changing configuration or role assignment invalidates Step 1 validation.
-- Hidden optional slots must not become required accidentally.
-- Replacing a slot must be transactional.
-
-## Revisit Conditions
-
-Revisit this decision when:
-
-- The workflow supports scan history or alternatives.
-- Additional dental scan roles are introduced.
-- Bulk import and assignment become a priority.
-- Geometry classification is implemented and validated.
+This decision is accepted, implemented, and locally verified for `v0.0.2`.
