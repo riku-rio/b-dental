@@ -23,8 +23,6 @@ class MarginValidationResult:
 
 def validate_step_three_preconditions(state) -> MarginValidationResult:
     errors = []
-    warnings = []
-
     if not state.case_initialized:
         errors.append("Initialize a B-Dental case before starting Step 3.")
     if not state.step_1_valid:
@@ -35,51 +33,58 @@ def validate_step_three_preconditions(state) -> MarginValidationResult:
         errors.append("Complete Single Arch Step 2 as not applicable before Step 3.")
     if state.scan_configuration != "SINGLE_ARCH" and state.step_2_status != "VERIFIED":
         errors.append("Approve the occlusal relationship before Step 3.")
-
-    target = restoration_utils.target_scan(state)
-    if target is None:
-        errors.append("The selected preparation scan is unavailable.")
-    elif not scene_utils.is_managed_for_role(target, state.target_arch):
-        errors.append("The selected preparation scan has invalid B-Dental role metadata.")
-
-    if errors:
-        return MarginValidationResult(
-            ok=False,
-            status="UPSTREAM_INVALID" if not state.step_2_valid else "ERROR",
-            summary=f"Step 3 has {len(errors)} blocking precondition error(s).",
-            errors=tuple(errors),
-            warnings=tuple(warnings),
-        )
     return MarginValidationResult(
-        ok=True,
-        status="SETUP_REQUIRED" if not state.restoration_id else "READY_FOR_MARGIN",
-        summary="Step 3 preconditions are valid.",
+        ok=not errors,
+        status="UPSTREAM_INVALID" if errors else "SETUP_REQUIRED",
+        summary=(
+            f"Step 3 has {len(errors)} blocking precondition error(s)."
+            if errors
+            else "Step 3 preconditions are valid."
+        ),
+        errors=tuple(errors),
     )
 
 
-def validate_restoration_setup(state) -> MarginValidationResult:
+def validate_restoration_setup(state, restoration) -> MarginValidationResult:
     preconditions = validate_step_three_preconditions(state)
     if not preconditions.ok:
         return preconditions
 
     errors = []
-    if state.restoration_type != restoration_utils.RESTORATION_TYPE:
-        errors.append("v0.0.4 supports one anatomical crown restoration only.")
-    if state.target_arch not in restoration_utils.available_target_arches(state):
-        errors.append("Choose an imported Upper Jaw or Lower Jaw preparation scan.")
-    if not restoration_utils.tooth_belongs_to_arch(state.target_tooth_fdi, state.target_arch):
-        errors.append("The selected FDI tooth does not belong to the preparation arch.")
-    if not state.restoration_id:
-        errors.append("Create the restoration setup before drawing the margin.")
+    if restoration is None:
+        errors.append("Select or add a restoration before drawing a margin.")
+    else:
+        if restoration.restoration_type != restoration_utils.RESTORATION_TYPE:
+            errors.append("v0.0.4 supports anatomical crown restorations only.")
+        if restoration.target_arch not in restoration_utils.available_target_arches(state):
+            errors.append("The restoration preparation arch is unavailable.")
+        if not restoration_utils.tooth_belongs_to_arch(
+            restoration.target_tooth_fdi, restoration.target_arch
+        ):
+            errors.append("The selected FDI tooth does not belong to the preparation arch.")
+        if restoration_utils.duplicate_tooth_exists(
+            state,
+            restoration.target_arch,
+            restoration.target_tooth_fdi,
+            exclude_id=restoration.restoration_id,
+        ):
+            errors.append("Another restoration already uses this target tooth.")
+        if not restoration.restoration_id:
+            errors.append("The restoration has no stable identifier.")
 
-    target = restoration_utils.target_scan(state)
-    current_signature = restoration_utils.target_scan_signature(target)
-    if state.target_scan_signature and current_signature != state.target_scan_signature:
-        errors.append("The target preparation scan changed after restoration setup.")
+        target = restoration_utils.target_scan(state, restoration)
+        if target is None:
+            errors.append("The restoration preparation scan is unavailable.")
+        elif not scene_utils.is_managed_for_role(target, restoration.target_arch):
+            errors.append("The preparation scan has invalid B-Dental role metadata.")
+        else:
+            current_signature = restoration_utils.target_scan_signature(target)
+            if restoration.target_scan_signature and current_signature != restoration.target_scan_signature:
+                errors.append("The target preparation scan changed after restoration creation.")
 
     return MarginValidationResult(
         ok=not errors,
-        status="READY_FOR_MARGIN" if not errors else "SETUP_REQUIRED",
+        status="READY_FOR_MARGIN" if not errors else "ERROR",
         summary=(
             "Restoration setup is valid."
             if not errors
@@ -89,20 +94,20 @@ def validate_restoration_setup(state) -> MarginValidationResult:
     )
 
 
-def validate_margin(state, depsgraph) -> MarginValidationResult:
-    setup = validate_restoration_setup(state)
+def validate_margin(state, restoration, depsgraph) -> MarginValidationResult:
+    setup = validate_restoration_setup(state, restoration)
     if not setup.ok:
         return setup
 
     errors = []
     warnings = []
-    margin = restoration_utils.resolve_margin(state)
-    target = restoration_utils.target_scan(state)
+    margin = restoration_utils.resolve_margin(restoration)
+    target = restoration_utils.target_scan(state, restoration)
 
-    if state.margin_session_active:
+    if restoration.margin_session_active:
         errors.append("Apply or cancel the active margin session before validation.")
     if margin is None:
-        errors.append("The active restoration does not have a managed margin curve.")
+        errors.append("This restoration does not have a managed margin curve.")
         return MarginValidationResult(
             ok=False,
             status="ERROR",
