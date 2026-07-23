@@ -9,29 +9,29 @@
 
 ## Project Structure
 
-- [ ] V001-005 Create the Blender extension source directory.
-- [ ] V001-006 Create `blender_manifest.toml`.
-- [ ] V001-007 Create the Python package entry point.
-- [ ] V001-008 Define which files are included in the distributable extension package.
+- [x] V001-005 Create the Blender extension source directory.
+- [x] V001-006 Create `blender_manifest.toml`.
+- [x] V001-007 Create the Python package entry point.
+- [x] V001-008 Define which files are included in the distributable extension package.
 
 ## Extension Registration
 
-- [ ] V001-009 Implement `register()`.
-- [ ] V001-010 Implement `unregister()`.
-- [ ] V001-011 Register the B-Dental panel class.
+- [x] V001-009 Implement `register()`.
+- [x] V001-010 Implement `unregister()`.
+- [x] V001-011 Register the B-Dental panel class.
 - [ ] V001-012 Verify that repeated enable, disable, and reload cycles do not produce duplicate-registration errors.
 
 ## User Interface
 
-- [ ] V001-013 Add a `B-Dental` tab to the 3D Viewport sidebar.
-- [ ] V001-014 Add a B-Dental panel inside the tab.
-- [ ] V001-015 Display the exact text `Not Implemented Yet.`
+- [x] V001-013 Add a `B-Dental` tab to the 3D Viewport sidebar.
+- [x] V001-014 Add a B-Dental panel inside the tab.
+- [x] V001-015 Display the exact text `Not Implemented Yet.`
 - [ ] V001-016 Verify that disabling the extension removes its interface elements.
 
 ## Validation and Local Verification
 
-- [ ] V001-017 Validate the extension manifest.
-- [ ] V001-018 Build the extension package.
+- [ ] V001-017 Validate the extension manifest with Blender's extension validator.
+- [ ] V001-018 Build the extension package with Blender's extension tooling.
 - [ ] V001-019 Install the built package locally in Blender.
 - [ ] V001-020 Enable the extension and verify that no Python errors occur.
 - [ ] V001-021 Verify that the B-Dental tab and panel are visible.
@@ -41,12 +41,23 @@
 
 ## Documentation and Completion
 
-- [ ] V001-025 Document the local validation and build commands.
-- [ ] V001-026 Document the local installation and enablement steps.
-- [ ] V001-027 Document the manual acceptance test.
+- [x] V001-025 Document the local validation and build commands.
+- [x] V001-026 Document the local installation and enablement steps.
+- [x] V001-027 Document the manual acceptance test.
 - [ ] V001-028 Confirm that every PRD acceptance criterion is satisfied.
-- [ ] V001-029 Update this checklist to reflect the final implementation state.
+- [ ] V001-029 Update this checklist after local Blender verification.
 - [ ] V001-030 Prepare v0.0.1 for review before merging into `main`.
+
+## Current Verification State
+
+A repository-side static check has confirmed that:
+
+- `extension/blender_manifest.toml` parses as valid TOML.
+- The required manifest fields used by this milestone are present.
+- `extension/__init__.py` compiles as valid Python syntax.
+- The build allowlist contains only `__init__.py` and `blender_manifest.toml`.
+
+These checks do not replace Blender's own extension validation, package build, installation, registration, UI, or cleanup tests. Complete the remaining tasks using [`VERIFICATION.md`](./VERIFICATION.md).
 
 ## Completion Rule
 
