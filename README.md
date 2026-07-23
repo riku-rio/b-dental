@@ -6,15 +6,15 @@ The project is developed through small, verifiable versions. Each version define
 
 ## Current Version: v0.0.2
 
-Version `v0.0.2` implements the first functional workflow stage:
+Version `v0.0.2` implements and verifies the first functional workflow stage:
 
 **Step 1 — Import Intra-Oral Scans**
 
-The extension now supports:
+The extension supports:
 
 - Explicit dental-case initialization.
 - Conservative removal of the untouched Blender startup cube.
-- A scene-persistent workflow state.
+- Scene-persistent workflow state.
 - Single Arch, Dual Arch, and Full Scan Set configurations.
 - Fixed roles for Upper Jaw, Lower Jaw, Right Bite, and Left Bite.
 - STL import through Blender's built-in importer.
@@ -26,36 +26,24 @@ The extension now supports:
 - A Step 2 placeholder displaying `Not Implemented Yet.`
 - Returning to Step 1 without clearing imported scans.
 
-## Current Status
+## Project Status
 
-The `v0.0.2` implementation is complete on:
+Version `v0.0.2` is implemented and locally verified on branch:
 
 `feat/v0.0.2-scan-import-workflow`
 
-Local Blender acceptance verification is still required before the version can be accepted and merged into `main`.
+The extension validates, builds, installs, enables, imports the supported scan configurations, validates Step 1, advances to Step 2, preserves workflow state, and completes its registration lifecycle successfully.
 
-The following remain intentionally open until they are executed locally:
-
-- Extension validation and package build.
-- Installation and enablement in the project Blender version.
-- Clean-scene and existing-scene safety tests.
-- STL import and replacement scenarios.
-- Validation scenarios for every supported scan configuration.
-- Save, close, and reopen persistence.
-- Repeated enable, disable, and reload lifecycle tests.
-
-See [`docs/v0.0.2/VERIFICATION.md`](docs/v0.0.2/VERIFICATION.md) for the required procedure and [`docs/v0.0.2/TASKS.md`](docs/v0.0.2/TASKS.md) for the current checklist.
+See [`docs/v0.0.2/VERIFICATION.md`](docs/v0.0.2/VERIFICATION.md) for the completed verification record and [`docs/v0.0.2/TASKS.md`](docs/v0.0.2/TASKS.md) for the completed checklist.
 
 ## Previous Version: v0.0.1
 
-Version `v0.0.1` established and locally verified the extension foundation:
+Version `v0.0.1` established and verified the extension foundation:
 
 - Modern Blender Extension packaging.
 - Deterministic registration and unregistration.
 - A `B-Dental` panel in the 3D Viewport sidebar.
 - Local validation, build, installation, and lifecycle documentation.
-
-It was verified with Blender 5.0.1 on Windows before being merged into `main`.
 
 ## Planned Next Workflow Stage
 
@@ -69,7 +57,7 @@ That stage should distinguish between:
 - A case that requires registration using right and left bite scans.
 - A case that requires manual correction.
 
-Imported alignment must be treated as a candidate until it is inspected and explicitly verified. Planning for that version begins only after `v0.0.2` passes local acceptance and is merged.
+Imported alignment must be treated as a candidate until it is inspected and explicitly verified.
 
 ## Repository Structure
 
@@ -94,5 +82,5 @@ b-dental/
 - Registration must not modify the user's scene.
 - Destructive actions must be explicit and narrowly scoped.
 - Dental workflow state and Blender operator results must remain separate.
-- Implemented behavior must not be marked accepted before local verification.
+- Implemented behavior must be locally verified before a version is accepted.
 - Each version must leave the repository in a reviewable and reproducible state.
