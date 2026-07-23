@@ -147,14 +147,7 @@ def validate_margin(state, restoration, depsgraph) -> MarginValidationResult:
 
     distances: tuple[float, ...] = ()
     if not errors and target is not None:
-        local_distances = margin_geometry.point_surface_distances(target, points, depsgraph)
-        scale_matrix = target.matrix_world.to_3x3()
-        distances = tuple(
-            (scale_matrix @ ((point.normalized() if point.length else point) * distance)).length
-            if math.isfinite(distance)
-            else float("inf")
-            for point, distance in zip(points, local_distances)
-        )
+        distances = margin_geometry.point_surface_distances(target, points, depsgraph)
         if any(not math.isfinite(value) for value in distances):
             errors.append("At least one margin point could not be resolved against the target surface.")
         elif distances and max(distances) > margin_geometry.SURFACE_BLOCKING_DISTANCE:
