@@ -1,0 +1,6 @@
+# Blender extension build output
+/dist/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
