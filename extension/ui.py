@@ -46,8 +46,15 @@ def _draw_scan_slot(layout, state, role: str, required: bool = True) -> None:
     _draw_wrapped_label(box, _object_summary(obj), icon="CHECKMARK")
     if obj.type == "MESH" and obj.data is not None:
         dimensions_mm = tuple(float(value) * 1000.0 for value in obj.dimensions)
-        box.label(text=f"{len(obj.data.vertices):,} vertices | {len(obj.data.polygons):,} faces")
-        box.label(text=f"{dimensions_mm[0]:.1f} x {dimensions_mm[1]:.1f} x {dimensions_mm[2]:.1f} mm")
+        box.label(
+            text=f"{len(obj.data.vertices):,} vertices | {len(obj.data.polygons):,} faces"
+        )
+        box.label(
+            text=(
+                f"{dimensions_mm[0]:.1f} x {dimensions_mm[1]:.1f} x "
+                f"{dimensions_mm[2]:.1f} mm"
+            )
+        )
 
     actions = box.row(align=True)
     focus = actions.operator("bdental.focus_scan", text="Focus", icon="VIEWZOOM")
@@ -75,7 +82,11 @@ def _draw_step_one(layout, state) -> None:
     else:
         layout.operator("bdental.start_case", text="Start New Dental Case", icon="FILE_NEW")
         info = layout.box()
-        _draw_wrapped_label(info, "Start a new dental case before importing scans. Enabling B-Dental does not modify the scene.", icon="INFO")
+        _draw_wrapped_label(
+            info,
+            "Start a new dental case before importing scans. Enabling B-Dental does not modify the scene.",
+            icon="INFO",
+        )
         return
 
     settings = layout.box()
@@ -92,7 +103,9 @@ def _draw_step_one(layout, state) -> None:
 
     validation_box = layout.box()
     validation_box.label(text="Validation")
-    ready = all(scene_utils.get_role_object(state, role) is not None for role in required)
+    ready = all(
+        scene_utils.get_role_object(state, role) is not None for role in required
+    )
     if state.step_1_status == "VALID" and state.step_1_valid:
         validation_box.label(text="Step 1 passed validation", icon="CHECKMARK")
     elif ready:
@@ -101,9 +114,23 @@ def _draw_step_one(layout, state) -> None:
         validation_box.label(text="Import all required scans", icon="ERROR")
     if state.validation_summary:
         _draw_wrapped_label(validation_box, state.validation_summary)
-    _draw_messages(layout, state.validation_errors, title="Blocking Errors", icon="ERROR")
-    _draw_messages(layout, state.validation_warnings, title="Warnings", icon="INFO")
-    layout.operator("bdental.validate_step_one", text="Validate & Continue", icon="FILE_TICK")
+    _draw_messages(
+        layout,
+        state.validation_errors,
+        title="Blocking Errors",
+        icon="ERROR",
+    )
+    _draw_messages(
+        layout,
+        state.validation_warnings,
+        title="Warnings",
+        icon="INFO",
+    )
+    layout.operator(
+        "bdental.validate_step_one",
+        text="Validate & Continue",
+        icon="FILE_TICK",
+    )
 
 
 def _draw_step_two_objects(layout, state) -> None:
@@ -134,13 +161,31 @@ def _draw_metrics(layout, state) -> None:
     box.label(text=f"Inliers: {state.registration_inlier_count:,}")
     box.label(text=f"Inlier ratio: {state.registration_inlier_ratio:.3f}")
     box.label(text=f"RMSE: {state.registration_rmse * 1000.0:.3f} mm")
-    box.label(text=f"Median: {state.registration_median_distance * 1000.0:.3f} mm")
-    box.label(text=f"Translation: {state.registration_translation_delta * 1000.0:.3f} mm")
+    box.label(
+        text=f"Median: {state.registration_median_distance * 1000.0:.3f} mm"
+    )
+    box.label(
+        text=f"Translation: {state.registration_translation_delta * 1000.0:.3f} mm"
+    )
     box.label(text=f"Rotation: {state.registration_rotation_delta:.4f} rad")
-    if state.bilateral_translation_disagreement > 0.0 or state.bilateral_rotation_disagreement > 0.0:
-        box.label(text=f"Bilateral delta: {state.bilateral_translation_disagreement * 1000.0:.3f} mm")
-        box.label(text=f"Bilateral rotation: {state.bilateral_rotation_disagreement:.4f} rad")
-    _draw_wrapped_label(box, "Metrics are engineering aids and do not prove clinical correctness.", icon="INFO")
+    if (
+        state.bilateral_translation_disagreement > 0.0
+        or state.bilateral_rotation_disagreement > 0.0
+    ):
+        box.label(
+            text=(
+                f"Bilateral delta: "
+                f"{state.bilateral_translation_disagreement * 1000.0:.3f} mm"
+            )
+        )
+        box.label(
+            text=f"Bilateral rotation: {state.bilateral_rotation_disagreement:.4f} rad"
+        )
+    _draw_wrapped_label(
+        box,
+        "Metrics are engineering aids and do not prove clinical correctness.",
+        icon="INFO",
+    )
 
 
 def _draw_step_two(layout, state) -> None:
@@ -152,75 +197,172 @@ def _draw_step_two(layout, state) -> None:
 
     if state.scan_configuration == "SINGLE_ARCH":
         info = layout.box()
-        _draw_wrapped_label(info, "Occlusion registration is not applicable because this case contains only one arch.", icon="INFO")
+        _draw_wrapped_label(
+            info,
+            "Occlusion registration is not applicable because this case contains only one arch.",
+            icon="INFO",
+        )
         if state.step_2_valid:
             info.label(text="Step 2 Complete", icon="CHECKMARK")
         else:
-            layout.operator("bdental.complete_step_two_na", text="Complete as Not Applicable", icon="CHECKMARK")
-        layout.operator("bdental.back_to_step_one_safe", text="Back to Step 1", icon="BACK")
+            layout.operator(
+                "bdental.complete_step_two_na",
+                text="Complete as Not Applicable",
+                icon="CHECKMARK",
+            )
+        layout.operator(
+            "bdental.back_to_step_one_safe",
+            text="Back to Step 1",
+            icon="BACK",
+        )
         return
 
     if state.step_2_status == "VERIFIED" and state.step_2_valid:
         complete = layout.box()
         complete.label(text="Step 2 Verified", icon="CHECKMARK")
-        _draw_wrapped_label(complete, state.step_2_summary or "Occlusal relationship approved.")
+        _draw_wrapped_label(
+            complete,
+            state.step_2_summary or "Occlusal relationship approved.",
+        )
         if state.verification_method:
-            complete.label(text=f"Method: {state.verification_method.replace('_', ' ').title()}")
+            complete.label(
+                text=f"Method: {state.verification_method.replace('_', ' ').title()}"
+            )
         _draw_metrics(layout, state)
         _draw_step_two_objects(layout, state)
-        layout.operator("bdental.back_to_step_one_safe", text="Back to Step 1", icon="BACK")
+        layout.operator(
+            "bdental.back_to_step_one_safe",
+            text="Back to Step 1",
+            icon="BACK",
+        )
         return
 
     analysis = layout.box()
     analysis.label(text="Imported Relationship")
-    _draw_wrapped_label(analysis, "Entering Step 2 does not move scans. Analyze the imported relationship before deciding whether alignment is needed.")
-    analysis.operator("bdental.analyze_step_two", text="Analyze Imported Relationship", icon="VIEWZOOM")
+    _draw_wrapped_label(
+        analysis,
+        "Entering Step 2 does not move scans. Analyze the imported relationship before deciding whether alignment is needed.",
+    )
+    analysis.operator(
+        "bdental.analyze_step_two",
+        text="Analyze Imported Relationship",
+        icon="VIEWZOOM",
+    )
 
     settings = layout.box()
     settings.label(text="Alignment Path")
     settings.prop(state, "alignment_mode", text="")
-    if state.alignment_mode == "BITE_GUIDED":
+    if state.alignment_mode == "IMPORTED":
+        _draw_wrapped_label(
+            settings,
+            "Imported mode preserves the scanner-exported relationship. Analyze it, run verification checks, and approve it without starting an alignment session.",
+            icon="INFO",
+        )
+    elif state.alignment_mode == "BITE_GUIDED":
         settings.prop(state, "bite_source", text="")
         if state.scan_configuration != "FULL_SCAN_SET":
-            _draw_wrapped_label(settings, "Bite-guided mode requires imported bite references.", icon="INFO")
+            _draw_wrapped_label(
+                settings,
+                "Bite-guided mode requires imported bite references.",
+                icon="INFO",
+            )
 
     if not state.alignment_session_active:
-        layout.operator("bdental.start_step_two_session", text="Start Alignment Session", icon="PLAY")
+        if state.alignment_mode in {"MANUAL", "BITE_GUIDED"}:
+            layout.operator(
+                "bdental.start_step_two_session",
+                text="Start Alignment Session",
+                icon="PLAY",
+            )
     else:
         session = layout.box()
         session.label(text="Alignment Session Active", icon="REC")
-        _draw_wrapped_label(session, "Upper Jaw is fixed. Preview changes remain reversible until Apply Candidate.")
+        _draw_wrapped_label(
+            session,
+            "Upper Jaw is fixed. Preview changes remain reversible until Apply Candidate.",
+        )
         if state.alignment_mode == "MANUAL":
-            _draw_wrapped_label(session, "Use Blender Move and Rotate tools on Lower Jaw, then capture the candidate.")
-            session.operator("bdental.capture_manual_step_two", text="Capture Manual Candidate", icon="CHECKMARK")
+            _draw_wrapped_label(
+                session,
+                "Use Blender Move and Rotate tools on Lower Jaw, then capture the candidate.",
+            )
+            session.operator(
+                "bdental.capture_manual_step_two",
+                text="Capture Manual Candidate",
+                icon="CHECKMARK",
+            )
         elif state.alignment_mode == "BITE_GUIDED":
-            session.operator("bdental.run_bite_step_two", text="Run Bite-Guided Registration", icon="MODIFIER")
+            session.operator(
+                "bdental.run_bite_step_two",
+                text="Run Bite-Guided Registration",
+                icon="MODIFIER",
+            )
         controls = session.row(align=True)
-        controls.operator("bdental.reset_step_two_preview", text="Reset", icon="LOOP_BACK")
-        controls.operator("bdental.cancel_step_two_session", text="Cancel", icon="CANCEL")
+        controls.operator(
+            "bdental.reset_step_two_preview",
+            text="Reset",
+            icon="LOOP_BACK",
+        )
+        controls.operator(
+            "bdental.cancel_step_two_session",
+            text="Cancel",
+            icon="CANCEL",
+        )
         if state.step_2_status == "CANDIDATE":
-            session.operator("bdental.apply_step_two_candidate", text="Apply Candidate", icon="CHECKMARK")
+            session.operator(
+                "bdental.apply_step_two_candidate",
+                text="Apply Candidate",
+                icon="CHECKMARK",
+            )
 
-    if state.step_2_status in {"CANDIDATE", "IMPORTED_CANDIDATE"} or state.candidate_applied:
-        layout.operator("bdental.verify_step_two", text="Run Verification Checks", icon="FILE_TICK")
+    if (
+        state.step_2_status in {"CANDIDATE", "IMPORTED_CANDIDATE"}
+        or state.candidate_applied
+    ):
+        layout.operator(
+            "bdental.verify_step_two",
+            text="Run Verification Checks",
+            icon="FILE_TICK",
+        )
 
-    _draw_messages(layout, state.step_2_errors, title="Blocking Errors", icon="ERROR")
-    _draw_messages(layout, state.step_2_warnings, title="Warnings", icon="INFO")
+    _draw_messages(
+        layout,
+        state.step_2_errors,
+        title="Blocking Errors",
+        icon="ERROR",
+    )
+    _draw_messages(
+        layout,
+        state.step_2_warnings,
+        title="Warnings",
+        icon="INFO",
+    )
     if state.step_2_summary:
         summary = layout.box()
         _draw_wrapped_label(summary, state.step_2_summary)
     _draw_metrics(layout, state)
 
-    if state.step_2_status in {"CANDIDATE", "IMPORTED_CANDIDATE"} and not state.alignment_session_active:
+    if (
+        state.step_2_status in {"CANDIDATE", "IMPORTED_CANDIDATE"}
+        and not state.alignment_session_active
+    ):
         approval = layout.box()
         approval.label(text="Approval")
         approval.prop(state, "review_confirmed")
         if state.step_2_warnings:
             approval.prop(state, "warning_acknowledged")
-        approval.operator("bdental.approve_step_two", text="Approve Occlusion", icon="CHECKMARK")
+        approval.operator(
+            "bdental.approve_step_two",
+            text="Approve Occlusion",
+            icon="CHECKMARK",
+        )
 
     _draw_step_two_objects(layout, state)
-    layout.operator("bdental.back_to_step_one_safe", text="Back to Step 1", icon="BACK")
+    layout.operator(
+        "bdental.back_to_step_one_safe",
+        text="Back to Step 1",
+        icon="BACK",
+    )
 
 
 class BDENTAL_PT_workflow(bpy.types.Panel):
