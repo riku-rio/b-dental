@@ -3,43 +3,23 @@
 ## Metadata
 
 - **Version:** v0.0.4
-- **Status:** Proposed
+- **Status:** Superseded
+- **Superseded by:** [`0006-support-multiple-independent-restorations.md`](0006-support-multiple-independent-restorations.md)
 - **Related requirements:** [`../PRD.md`](../PRD.md)
 - **Related plan:** [`../plans/0001-restoration-setup-manual-margin-definition.md`](../plans/0001-restoration-setup-manual-margin-definition.md)
 
-## Context
+## Original Context
 
-A manual margin needs a restoration identity, target preparation scan, and target tooth. Supporting multiple restorations or multiple restoration types in the first Step 3 implementation would multiply ownership, selection, invalidation, UI, persistence, and cleanup paths before the core margin workflow has been verified.
+The earliest v0.0.4 design limited a case to one anatomical crown so the first manual-margin implementation could avoid collection ownership, selection, and independent approval concerns.
 
-## Decision
+## Original Decision
 
-- Version `v0.0.4` supports zero or one active restoration per case.
-- The only supported restoration type is `ANATOMICAL_CROWN`.
-- The restoration is single-unit.
-- A stable restoration ID associates workflow state and managed artifacts.
-- Creating, resetting, or retargeting the restoration is explicit.
-- Existing managed margin geometry requires confirmation before destructive setup changes.
-- Multi-restoration and additional restoration types remain out of scope.
+The initial implementation exposed one active restoration and one managed margin per case.
 
-## Rationale
+## Supersession
 
-This creates the smallest useful restoration model while preserving a clear identity boundary for the margin. It allows Step 3 safety, persistence, editing, and invalidation behavior to be tested without prematurely committing to bridge or multi-unit architecture.
+Hands-on verification showed that replacing the active restoration prevents a normal case from retaining margins for multiple prepared teeth and prevents a dual-arch case from keeping both upper and lower restorations.
 
-## Rejected Alternatives
+The product requirement has therefore changed. Version v0.0.4 now supports multiple independent single-unit anatomical crown restorations in one B-Dental case. Each restoration owns its own target arch, FDI tooth, margin, diagnostics, session state, and approval.
 
-- **Draw a margin without creating a restoration:** rejected because ownership and future downstream use would be ambiguous.
-- **Support an arbitrary list of restorations immediately:** rejected because it greatly increases state and cleanup complexity.
-- **Support every restoration type with the same margin UI:** rejected because different indications require different downstream rules and not all use the same design workflow.
-- **Infer the restoration from the selected Blender object:** rejected because transient Blender selection is not durable workflow state.
-
-## Consequences
-
-- The Step 3 UI remains focused.
-- One margin can be resolved deterministically.
-- Setup changes can remove only the active restoration's margin.
-- Later multi-restoration support will require a deliberate migration from scalar state to a collection model.
-- The stable restoration ID must be persisted and included in artifact metadata.
-
-## Acceptance Confirmation
-
-This decision becomes accepted when the v0.0.4 documentation set is approved. Implementation must not expose unfinished multi-unit or multi-type behavior.
+This record remains in the repository to preserve the design history. It is no longer authoritative for implementation.
