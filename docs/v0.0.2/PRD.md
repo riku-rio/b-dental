@@ -6,7 +6,6 @@
 - **Version:** v0.0.2
 - **Status:** Proposed
 - **Target implementation branch:** `feat/v0.0.2-scan-import-workflow`
-- **Documentation branch:** `docs/v0.0.2-scan-import-workflow`
 
 ## Product Overview
 

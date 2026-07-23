@@ -1,11 +1,11 @@
-# Decision 0004: Use Scene-Persistent Workflow State and Conditional Panel Navigation
+# Decision 0003: Use Scene-Persistent Workflow State and Conditional Panel Navigation
 
 ## Metadata
 
 - **Version:** v0.0.2
 - **Status:** Proposed
 - **Related requirements:** [`../PRD.md`](../PRD.md)
-- **Related plan:** [`../plans/0002-scan-import-workflow.md`](../plans/0002-scan-import-workflow.md)
+- **Related plan:** [`../plans/0002-scan-import-workflow.md`](../plans/0001-scan-import-workflow.md)
 - **Supersedes:** Nothing
 - **Extends:** [`../../v0.0.1/decisions/0001-use-3d-viewport-sidebar-panel.md`](../../v0.0.1/decisions/0001-use-3d-viewport-sidebar-panel.md)
 

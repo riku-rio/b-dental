@@ -8,7 +8,7 @@
 - [x] V002-004 Record the fixed scan-slot and configuration decision.
 - [x] V002-005 Record the workflow-state and step-navigation decision.
 - [x] V002-006 Record the local verification plan.
-- [ ] V002-007 Review and approve the v0.0.2 documentation set.
+- [x] V002-007 Review and approve the v0.0.2 documentation set.
 
 ## Project Structure
 

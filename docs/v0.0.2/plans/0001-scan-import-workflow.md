@@ -8,9 +8,9 @@
 - **Related requirements:** [`../PRD.md`](../PRD.md)
 - **Related tasks:** [`../TASKS.md`](../TASKS.md)
 - **Related decisions:**
-  - [`../decisions/0002-safe-case-initialization.md`](../decisions/0002-safe-case-initialization.md)
-  - [`../decisions/0003-fixed-scan-role-slots.md`](../decisions/0003-fixed-scan-role-slots.md)
-  - [`../decisions/0004-scene-persistent-workflow-state.md`](../decisions/0004-scene-persistent-workflow-state.md)
+  - [`../decisions/0001-safe-case-initialization.md`](../decisions/0001-safe-case-initialization.md)
+  - [`../decisions/0002-fixed-scan-role-slots.md`](../decisions/0002-fixed-scan-role-slots.md)
+  - [`../decisions/0003-scene-persistent-workflow-state.md`](../decisions/0003-scene-persistent-workflow-state.md)
 
 ## Objective
 

@@ -1,11 +1,11 @@
-# Decision 0002: Use Explicit and Safe Case Initialization
+# Decision 0001: Use Explicit and Safe Case Initialization
 
 ## Metadata
 
 - **Version:** v0.0.2
 - **Status:** Proposed
 - **Related requirements:** [`../PRD.md`](../PRD.md)
-- **Related plan:** [`../plans/0002-scan-import-workflow.md`](../plans/0002-scan-import-workflow.md)
+- **Related plan:** [`../plans/0001-scan-import-workflow.md`](../plans/0001-scan-import-workflow.md)
 
 ## Context
 
