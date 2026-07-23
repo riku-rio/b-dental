@@ -42,7 +42,11 @@ def _store_metrics(state, result):
 
 
 def _ready(context):
-    return bool(context.scene and hasattr(context.scene, "bdental_workflow") and context.scene.bdental_workflow.step_1_valid)
+    return bool(
+        context.scene
+        and hasattr(context.scene, "bdental_workflow")
+        and context.scene.bdental_workflow.step_1_valid
+    )
 
 
 def _select_lower(context, lower):
@@ -67,12 +71,18 @@ class BDENTAL_OT_analyze_step_two(bpy.types.Operator):
 
     def execute(self, context):
         state = _state(context)
-        matrices = {role: obj.matrix_world.copy() for role in properties.SCAN_ROLES if (obj := scene_utils.get_role_object(state, role))}
+        matrices = {
+            role: obj.matrix_world.copy()
+            for role in properties.SCAN_ROLES
+            if (obj := scene_utils.get_role_object(state, role))
+        }
         result = occlusion_validation.analyze_imported_relationship(state)
         for role, matrix in matrices.items():
             obj = scene_utils.get_role_object(state, role)
             if obj:
                 obj.matrix_world = matrix
+
+        state.alignment_session_active = False
         state.step_2_valid = False
         state.step_2_status = result.status
         state.alignment_mode = "IMPORTED"
@@ -88,7 +98,10 @@ class BDENTAL_OT_complete_step_two_na(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return _ready(context) and context.scene.bdental_workflow.scan_configuration == "SINGLE_ARCH"
+        return (
+            _ready(context)
+            and context.scene.bdental_workflow.scan_configuration == "SINGLE_ARCH"
+        )
 
     def invoke(self, context, event):
         return context.window_manager.invoke_confirm(self, event)
@@ -109,14 +122,28 @@ class BDENTAL_OT_start_step_two_session(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return _ready(context) and not context.scene.bdental_workflow.alignment_session_active
+        if not _ready(context):
+            return False
+        state = context.scene.bdental_workflow
+        return (
+            not state.alignment_session_active
+            and state.alignment_mode in {"MANUAL", "BITE_GUIDED"}
+        )
 
     def execute(self, context):
         state = _state(context)
+        if state.alignment_mode == "IMPORTED":
+            self.report(
+                {"ERROR"},
+                "Imported alignment does not use a session. Analyze and verify it directly.",
+            )
+            return {"CANCELLED"}
+
         result = occlusion_validation.validate_step_two_preconditions(state)
         if not result.ok or state.scan_configuration == "SINGLE_ARCH":
             _messages(state, result.summary, result.errors, result.warnings)
             return {"CANCELLED"}
+
         step_two_session.snapshot_session(state)
         state.alignment_session_active = True
         state.step_2_status = "ALIGNING"
@@ -124,6 +151,7 @@ class BDENTAL_OT_start_step_two_session(bpy.types.Operator):
         state.candidate_applied = False
         _clear_metrics(state)
         _messages(state, "Alignment session started. Upper Jaw remains fixed.")
+
         if state.alignment_mode == "MANUAL":
             lower = scene_utils.get_role_object(state, "LOWER_JAW")
             if lower:
@@ -177,7 +205,11 @@ class BDENTAL_OT_capture_manual_step_two(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         state = context.scene.bdental_workflow if context.scene else None
-        return bool(state and state.alignment_session_active and state.alignment_mode == "MANUAL")
+        return bool(
+            state
+            and state.alignment_session_active
+            and state.alignment_mode == "MANUAL"
+        )
 
     def execute(self, context):
         state = _state(context)
@@ -185,17 +217,24 @@ class BDENTAL_OT_capture_manual_step_two(bpy.types.Operator):
         lower = scene_utils.get_role_object(state, "LOWER_JAW")
         start_upper = step_two_session.matrix_from_string(state.session_upper_matrix)
         errors = []
+
         if not upper or not lower or start_upper is None:
             errors.append("Session matrices are unavailable.")
         else:
-            translation, rotation = occlusion_validation.matrix_distance(start_upper, upper.matrix_world)
+            translation, rotation = occlusion_validation.matrix_distance(
+                start_upper, upper.matrix_world
+            )
             if translation > 1.0e-5 or rotation > 1.0e-3:
                 errors.append("Upper Jaw moved. Reset and move only the Lower Jaw.")
-            if not occlusion_validation.matrix_is_rigid(lower.matrix_world):
-                errors.append("Lower Jaw contains scale or shear. Use move and rotate only.")
+            if occlusion_validation.matrix_uniform_scale(lower.matrix_world) is None:
+                errors.append(
+                    "Lower Jaw contains non-uniform scale, shear, reflection, or invalid values. Use move and rotate only."
+                )
+
         if errors:
             _messages(state, "Manual candidate is invalid.", tuple(errors))
             return {"CANCELLED"}
+
         state.step_2_status = "CANDIDATE"
         _messages(state, "Manual candidate captured. Run verification checks.")
         return {"FINISHED"}
@@ -217,21 +256,36 @@ class BDENTAL_OT_run_bite_step_two(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         state = context.scene.bdental_workflow if context.scene else None
-        return bool(state and state.alignment_session_active and state.alignment_mode == "BITE_GUIDED")
+        return bool(
+            state
+            and state.alignment_session_active
+            and state.alignment_mode == "BITE_GUIDED"
+        )
 
     def execute(self, context):
         state = _state(context)
         upper = scene_utils.get_role_object(state, "UPPER_JAW")
         lower = scene_utils.get_role_object(state, "LOWER_JAW")
-        roles = {"RIGHT": ("RIGHT_BITE",), "LEFT": ("LEFT_BITE",), "BOTH": ("RIGHT_BITE", "LEFT_BITE")}[state.bite_source]
+        roles = {
+            "RIGHT": ("RIGHT_BITE",),
+            "LEFT": ("LEFT_BITE",),
+            "BOTH": ("RIGHT_BITE", "LEFT_BITE"),
+        }[state.bite_source]
         bites = [scene_utils.get_role_object(state, role) for role in roles]
+
         if not upper or not lower or any(not bite for bite in bites):
-            _messages(state, "Selected bite input is missing.", ("Import the selected bite scan and retry.",))
+            _messages(
+                state,
+                "Selected bite input is missing.",
+                ("Import the selected bite scan and retry.",),
+            )
             return {"CANCELLED"}
+
         step_two_session.restore_session(state)
         safe = {obj.name: obj.matrix_world.copy() for obj in (upper, lower, *bites)}
         warnings = []
         diagnostics = []
+
         try:
             target_groups = []
             upper_points = _sample(context, upper)
@@ -239,27 +293,48 @@ class BDENTAL_OT_run_bite_step_two(bpy.types.Operator):
                 result = _run_registration(context, bite, upper_points)
                 if not result.ok:
                     raise RuntimeError(result.errors[0])
+
                 bite.matrix_world = result.transform @ bite.matrix_world
                 target_points = _sample(context, bite)
                 target_groups.append(target_points)
+
                 diagnostic = _run_registration(context, lower, target_points)
                 if diagnostic.ok:
                     diagnostics.append(diagnostic.transform @ lower.matrix_world)
                 warnings.extend(result.warnings)
-            lower_result = _run_registration(context, lower, alignment.combine_points(*target_groups))
+
+            lower_result = _run_registration(
+                context,
+                lower,
+                alignment.combine_points(*target_groups),
+            )
             if not lower_result.ok:
                 raise RuntimeError(lower_result.errors[0])
+
             lower.matrix_world = lower_result.transform @ lower.matrix_world
             _store_metrics(state, lower_result)
             warnings.extend(lower_result.warnings)
+
             if len(diagnostics) == 2:
-                disagreement = alignment.transform_disagreement(diagnostics[0], diagnostics[1])
+                disagreement = alignment.transform_disagreement(
+                    diagnostics[0], diagnostics[1]
+                )
                 state.bilateral_translation_disagreement = disagreement.translation
                 state.bilateral_rotation_disagreement = disagreement.rotation
-                if disagreement.translation > 0.003 or disagreement.rotation > 0.0872665:
-                    warnings.append("Right and left bite results disagree; inspect both sides carefully.")
+                if (
+                    disagreement.translation > 0.003
+                    or disagreement.rotation > 0.0872665
+                ):
+                    warnings.append(
+                        "Right and left bite results disagree; inspect both sides carefully."
+                    )
+
             state.step_2_status = "CANDIDATE"
-            _messages(state, "Bite-guided candidate created. Run verification checks.", warnings=tuple(dict.fromkeys(warnings)))
+            _messages(
+                state,
+                "Bite-guided candidate created. Run verification checks.",
+                warnings=tuple(dict.fromkeys(warnings)),
+            )
             return {"FINISHED"}
         except Exception as exc:
             for obj in (upper, lower, *bites):
@@ -277,14 +352,21 @@ class BDENTAL_OT_apply_step_two_candidate(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         state = context.scene.bdental_workflow if context.scene else None
-        return bool(state and state.alignment_session_active and state.step_2_status == "CANDIDATE")
+        return bool(
+            state
+            and state.alignment_session_active
+            and state.step_2_status == "CANDIDATE"
+        )
 
     def execute(self, context):
         state = _state(context)
         state.alignment_session_active = False
         state.candidate_applied = True
         state.step_2_valid = False
-        _messages(state, "Candidate applied. Verification and approval are still required.")
+        _messages(
+            state,
+            "Candidate applied. Verification and approval are still required.",
+        )
         return {"FINISHED"}
 
 
@@ -312,7 +394,14 @@ class BDENTAL_OT_approve_step_two(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         state = context.scene.bdental_workflow if context.scene else None
-        return bool(state and state.step_2_status in {"CANDIDATE", "IMPORTED_CANDIDATE"} and state.review_confirmed and not state.step_2_errors and (not state.step_2_warnings or state.warning_acknowledged) and not state.alignment_session_active)
+        return bool(
+            state
+            and state.step_2_status in {"CANDIDATE", "IMPORTED_CANDIDATE"}
+            and state.review_confirmed
+            and not state.step_2_errors
+            and (not state.step_2_warnings or state.warning_acknowledged)
+            and not state.alignment_session_active
+        )
 
     def execute(self, context):
         state = _state(context)
@@ -320,11 +409,17 @@ class BDENTAL_OT_approve_step_two(bpy.types.Operator):
         if not result.ok or (result.warnings and not state.warning_acknowledged):
             _messages(state, result.summary, result.errors, result.warnings)
             return {"CANCELLED"}
+
         step_two_session.snapshot_approved(state)
         state.verification_method = state.alignment_mode
         state.step_2_status = "VERIFIED"
         state.step_2_valid = True
-        _messages(state, f"Step 2 approved using {state.alignment_mode.replace('_', ' ').title()} mode.", warnings=result.warnings)
+        _messages(
+            state,
+            f"Step 2 approved using {state.alignment_mode.replace('_', ' ').title()} mode.",
+            warnings=result.warnings,
+        )
+
         for role in ("RIGHT_BITE", "LEFT_BITE"):
             obj = scene_utils.get_role_object(state, role)
             if obj:
