@@ -4,60 +4,63 @@ B-Dental is a custom Blender Extension for building a structured digital dental 
 
 The project is developed through small, verifiable versions. Each version defines its requirements, architectural decisions, implementation plan, task checklist, and local verification procedure before the next workflow stage begins.
 
-## Current Version: v0.0.2
+## Current Version: v0.0.3
 
-Version `v0.0.2` implements and verifies the first functional workflow stage:
+Version `v0.0.3` implements and verifies the second workflow stage:
 
-**Step 1 — Import Intra-Oral Scans**
+**Step 2 — Occlusion Registration & Verification**
 
-The extension supports:
+The extension now supports:
 
-- Explicit dental-case initialization.
-- Conservative removal of the untouched Blender startup cube.
-- Scene-persistent workflow state.
-- Single Arch, Dual Arch, and Full Scan Set configurations.
-- Fixed roles for Upper Jaw, Lower Jaw, Right Bite, and Left Bite.
-- STL import through Blender's built-in importer.
-- Source-unit selection with millimeters as the default.
-- Managed scan collections, deterministic names, and object metadata.
-- Import, replace, remove, focus, and visibility controls.
-- Blocking scan validation and non-blocking geometry warnings.
-- Transition to Step 2 only after Step 1 validation succeeds.
-- A Step 2 placeholder displaying `Not Implemented Yet.`
-- Returning to Step 1 without clearing imported scans.
+- Preserving the scanner-imported upper-to-lower relationship until the user chooses an action.
+- Treating imported jaw relationships as unverified candidates rather than automatically accepting or moving them.
+- Single Arch completion as explicitly not applicable.
+- Dual Arch imported-relationship analysis and manual alignment.
+- Full Scan Set registration using Right Bite, Left Bite, or Both Bites.
+- Bite-mediated registration without direct upper-to-lower ICP.
+- A fixed upper jaw and a moving lower jaw during registration.
+- Reversible alignment sessions with start, reset, cancel, capture, and apply actions.
+- Deterministic world-space sampling, robust correspondence filtering, and bounded rigid ICP.
+- Registration metrics, warnings, gross-separation checks, and bilateral bite disagreement diagnostics.
+- Explicit review confirmation and warning acknowledgment before approval.
+- `step_2_valid` becoming true only after explicit approval or confirmed Single Arch completion.
+- Persistent Step 2 state, matrices, metrics, method, and verification summary.
+- Safe Step 2 invalidation when Step 1 inputs or approved transforms materially change.
+- Context-sensitive Step 2 UI at normal Blender sidebar width.
 
 ## Project Status
 
-Version `v0.0.2` is implemented and locally verified on branch:
+Version `v0.0.3` is implemented and locally verified on branch:
 
-`feat/v0.0.2-scan-import-workflow`
+`feat/v0.0.3-occlusion-registration-verification`
 
-The extension validates, builds, installs, enables, imports the supported scan configurations, validates Step 1, advances to Step 2, preserves workflow state, and completes its registration lifecycle successfully.
+The extension manifest is versioned as `0.0.3`, the required modules are included in the build, Step 1 remains regression-free, and the Step 2 workflow has passed the documented local scenario matrix.
 
-See [`docs/v0.0.2/VERIFICATION.md`](docs/v0.0.2/VERIFICATION.md) for the completed verification record and [`docs/v0.0.2/TASKS.md`](docs/v0.0.2/TASKS.md) for the completed checklist.
+See:
 
-## Previous Version: v0.0.1
+- [`docs/v0.0.3/PRD.md`](docs/v0.0.3/PRD.md)
+- [`docs/v0.0.3/plans/0001-occlusion-registration-verification.md`](docs/v0.0.3/plans/0001-occlusion-registration-verification.md)
+- [`docs/v0.0.3/TASKS.md`](docs/v0.0.3/TASKS.md)
+- [`docs/v0.0.3/VERIFICATION.md`](docs/v0.0.3/VERIFICATION.md)
+- [`docs/v0.0.3/decisions/`](docs/v0.0.3/decisions/)
 
-Version `v0.0.1` established and verified the extension foundation:
+## Previous Version: v0.0.2
 
-- Modern Blender Extension packaging.
-- Deterministic registration and unregistration.
-- A `B-Dental` panel in the 3D Viewport sidebar.
-- Local validation, build, installation, and lifecycle documentation.
+Version `v0.0.2` implemented and verified **Step 1 — Import Intra-Oral Scans**:
+
+- Explicit dental-case initialization.
+- Scene-persistent workflow state.
+- Single Arch, Dual Arch, and Full Scan Set configurations.
+- Fixed Upper Jaw, Lower Jaw, Right Bite, and Left Bite roles.
+- STL import through Blender's built-in importer.
+- Managed scan objects, validation, focus, visibility, replacement, and removal controls.
+- Transition to Step 2 only after Step 1 validation succeeds.
 
 ## Planned Next Workflow Stage
 
-The next version is expected to replace the Step 2 placeholder with:
+The next release is planned as `v0.0.4` and will implement **Step 3**.
 
-**Occlusion Registration & Verification**
-
-That stage should distinguish between:
-
-- A jaw relationship already preserved by the scanner export.
-- A case that requires registration using right and left bite scans.
-- A case that requires manual correction.
-
-Imported alignment must be treated as a candidate until it is inspected and explicitly verified.
+Step 3 requirements, architectural decisions, plan, tasks, and verification criteria must be approved before implementation begins. Version `v0.0.3` intentionally contains no production Step 3 behavior.
 
 ## Repository Structure
 
@@ -65,13 +68,23 @@ Imported alignment must be treated as a candidate until it is inspected and expl
 b-dental/
 ├── docs/
 │   ├── v0.0.1/
-│   └── v0.0.2/
+│   ├── v0.0.2/
+│   └── v0.0.3/
+│       ├── decisions/
+│       ├── plans/
+│       ├── PRD.md
+│       ├── TASKS.md
+│       └── VERIFICATION.md
 └── extension/
     ├── __init__.py
+    ├── alignment.py
     ├── blender_manifest.toml
+    ├── occlusion_validation.py
     ├── operators.py
     ├── properties.py
     ├── scene_utils.py
+    ├── step_two_operators.py
+    ├── step_two_session.py
     ├── ui.py
     └── validation.py
 ```
@@ -82,5 +95,8 @@ b-dental/
 - Registration must not modify the user's scene.
 - Destructive actions must be explicit and narrowly scoped.
 - Dental workflow state and Blender operator results must remain separate.
+- Imported occlusion is a candidate until the user explicitly approves it.
+- Registration metrics are engineering aids and are not clinical certification.
 - Implemented behavior must be locally verified before a version is accepted.
 - Each version must leave the repository in a reviewable and reproducible state.
+- Completed release branches are merged with **Squash and merge**.
