@@ -92,6 +92,10 @@ def capture_candidate(state, restoration) -> tuple[bool, str]:
     if margin_geometry.unique_point_count(points) < margin_geometry.MIN_MARGIN_POINTS:
         return False, "The margin requires at least six unique points."
     margin_geometry.replace_curve_points(margin, points, cyclic=True)
+    target = restoration_utils.target_scan(state, restoration)
+    world_points = tuple(target.matrix_world @ point for point in points) if target else ()
+    restoration.margin_point_count = len(points)
+    restoration.margin_path_length = margin_geometry.path_length(world_points)
     restoration.margin_candidate_closed = True
     restoration.status = "CANDIDATE"
     restoration.valid = False
