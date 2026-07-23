@@ -1,38 +1,39 @@
-# Plan 0001: Restoration Setup & Manual Margin Definition
+# Plan 0001: Multiple Restoration Setup & Manual Margin Definition
 
 ## Metadata
 
 - **Version:** v0.0.4
-- **Status:** Proposed
+- **Status:** In Progress
 - **Target branch:** `feat/v0.0.4-restoration-setup-manual-margin-definition`
 - **Related requirements:** [`../PRD.md`](../PRD.md)
 - **Related tasks:** [`../TASKS.md`](../TASKS.md)
 - **Related decisions:**
-  - [`../decisions/0001-limit-v0.0.4-to-one-anatomical-crown.md`](../decisions/0001-limit-v0.0.4-to-one-anatomical-crown.md)
+  - [`../decisions/0001-limit-v0.0.4-to-one-anatomical-crown.md`](../decisions/0001-limit-v0.0.4-to-one-anatomical-crown.md) — superseded
   - [`../decisions/0002-use-permanent-fdi-tooth-identifiers.md`](../decisions/0002-use-permanent-fdi-tooth-identifiers.md)
   - [`../decisions/0003-represent-margin-as-managed-target-local-curve.md`](../decisions/0003-represent-margin-as-managed-target-local-curve.md)
   - [`../decisions/0004-use-reversible-manual-margin-sessions.md`](../decisions/0004-use-reversible-manual-margin-sessions.md)
   - [`../decisions/0005-require-explicit-margin-validation-and-approval.md`](../decisions/0005-require-explicit-margin-validation-and-approval.md)
+  - [`../decisions/0006-support-multiple-independent-restorations.md`](../decisions/0006-support-multiple-independent-restorations.md)
 
 ## Objective
 
-Replace the post-Step-2 endpoint with a safe, persistent, and verifiable Step 3 workflow that defines one anatomical-crown restoration and one manually drawn margin on its preparation scan.
+Implement Step 3 as a collection-based workflow supporting multiple independent anatomical crown restorations and manual margins in one B-Dental case.
 
-The completed workflow must establish a stable restoration identity, constrain target selection, preserve imported scan geometry, provide reversible margin drawing and editing, report engineering diagnostics, and require explicit approval before Step 3 is complete.
+The workflow must preserve upper and lower restorations simultaneously, isolate every margin operation to the active restoration, and derive aggregate Step 3 completion only when every configured restoration is approved.
 
 ## Delivery Principles
 
-- Keep v0.0.4 limited to one active single-unit anatomical crown.
-- Do not implement automatic margin detection.
-- Do not implement insertion axis or crown generation.
-- Keep imported scans read-only at the mesh-data level.
-- Make all destructive cleanup explicit and narrowly scoped.
-- Store margin points in the preparation scan's local coordinate system.
-- Separate operator success, candidate state, validation, and approval.
-- Preserve applied geometry when upstream state becomes temporarily invalid whenever safe.
-- Use only Blender and Python standard-library capabilities.
+- Multiple restorations, but one active editing target at a time.
+- One unique restoration per arch and FDI tooth.
+- One managed margin object per restoration.
+- Independent session, diagnostics, validation, and approval state.
+- Switching blocked during active sessions.
+- No imported scan mesh edits.
+- No automatic margin detection, insertion axis, or crown generation.
+- Preserve safe geometry during upstream invalidation.
+- Use Blender and the Python standard library only.
 
-## Expected Source Structure
+## Source Structure
 
 ```text
 extension/
@@ -54,311 +55,150 @@ extension/
 └── validation.py
 ```
 
-The implementation may refine the structure, but Step 3 responsibilities must remain separated from Step 1 and Step 2 code.
+## Architecture
 
-## Architecture Plan
+### Collection State
 
-### State Layer
+`properties.py` provides:
 
-Extend `properties.py` with:
+- `BDENTAL_PG_RestorationState` for one restoration.
+- `CollectionProperty` named `restorations`.
+- Persistent `active_restoration_index`.
+- New-restoration arch and FDI controls.
+- Per-restoration status, validity, margin pointer, sessions, diagnostics, and approval snapshots.
+- Aggregate `step_3_status` and `step_3_valid` synchronization.
+- Legacy single-restoration properties retained only for one-time migration.
 
-- `STEP_3` workflow navigation.
-- Step 3 status and validity.
-- Stable restoration identity.
-- Fixed anatomical-crown restoration type.
-- Target arch and permanent FDI tooth.
-- Margin object pointer.
-- Active-session and candidate state.
-- Review confirmation and warning acknowledgment.
-- Diagnostics and summaries.
-- Session and approved point snapshots.
-- Target-scan and upstream approval signatures.
-- Step 1-to-Step 3 and Step 2-to-Step 3 invalidation behavior.
+### Restoration Ownership
 
-Add explicit helpers:
+`restoration_utils.py` provides:
 
-- `clear_step_three_state()`
-- `invalidate_step_three()`
-- dependency-aware reset behavior
+- Stable IDs.
+- Permanent FDI constraints.
+- Duplicate-tooth detection.
+- Active-restoration resolution.
+- Per-restoration target-scan resolution.
+- Managed margin metadata and recovery.
+- Safe per-restoration and whole-case cleanup.
+- Legacy single-restoration migration.
 
-Case reset must also clear Step 2 state completely before Step 3 is added.
+### Margin Geometry
 
-### Restoration Layer
+`margin_geometry.py` provides:
 
-Create `restoration_utils.py` for:
+- One target-local 3D `POLY` Curve per restoration.
+- Target-only viewport ray casting.
+- Ordered point replacement and serialization.
+- Reprojection and diagnostics.
 
-- Restoration ID generation.
-- Supported restoration constants.
-- Permanent FDI tooth sets.
-- Arch-to-tooth constraints.
-- Target scan resolution.
-- Managed restoration collection creation.
+### Validation
+
+`margin_validation.py` accepts both workflow state and a restoration item. It validates:
+
+- Upstream state.
+- Unique restoration target.
+- Target scan and signature.
 - Margin ownership metadata.
-- Safe managed-artifact lookup and cleanup.
-- Target-scan signatures.
+- Curve structure, closure, and points.
+- Surface distance and path diagnostics.
 
-### Margin Geometry Layer
+### Sessions and Monitoring
 
-Create `margin_geometry.py` for:
+`step_three_session.py` snapshots and restores only the active restoration. Dependency monitoring iterates all restorations and invalidates each independently.
 
-- Evaluated target-only ray casting.
-- World-to-target-local coordinate conversion.
-- Target-local-to-world display conversion.
-- Curve and spline creation.
-- Ordered point replacement.
-- Point serialization and deserialization.
-- Path-length calculation.
-- Point-to-surface distance calculation.
-- Edited-point reprojection.
-- Approximate spacing and non-adjacent proximity diagnostics.
+### Operators
 
-### Validation Layer
+`step_three_operators.py` provides:
 
-Create `margin_validation.py` for:
-
-- Step 3 precondition checks.
-- Restoration setup checks.
-- Managed margin metadata checks.
-- Curve structure checks.
-- Point-count and finite-coordinate checks.
-- Cyclic-closure checks.
-- Surface-distance checks.
-- Path diagnostics.
-- Approval-readiness results.
-- Separate blocking errors and warnings.
-
-### Session Layer
-
-Create `step_three_session.py` for:
-
-- Exact ordered point snapshots.
-- Existing-margin and no-margin session starts.
-- Draft-object cleanup.
-- Reset behavior.
-- Cancel behavior.
-- Candidate application.
-- Failure rollback.
-- Prior status and approval restoration.
-
-### Operator Layer
-
-Create `step_three_operators.py` for:
-
-- Enter Step 3.
-- Create or reset restoration setup.
-- Confirm target-arch changes.
-- Confirm target-tooth changes.
-- Start margin session.
-- Modal target-only margin drawing.
-- Remove last point.
-- Finish and close candidate.
-- Reset session.
-- Cancel session.
-- Apply candidate.
-- Prepare margin for editing.
-- Reproject edited points.
-- Recapture edited candidate.
-- Validate margin.
-- Approve margin.
+- Step 3 entry.
+- Add, select, and remove restoration.
+- Active restoration drawing and editing.
+- Reset, cancel, apply, validate, and approve.
 - Focus and visibility actions.
 - Safe return to Step 2.
 
-### UI Layer
+### UI
 
-Update `ui.py` to:
+`ui.py` displays:
 
-- Display three workflow steps.
-- Replace `Step 1 of 2` and `Step 2 of 2` with three-step progress text.
-- Add an explicit Step 2-to-Step 3 transition after Step 2 completion.
-- Display restoration setup before drawing controls.
-- Display target scan and tooth selection.
-- Display context-sensitive session controls.
-- Display modal drawing instructions.
-- Display editing and reprojection actions.
-- Display validation errors, warnings, and diagnostics.
-- Display review confirmation and approval controls.
-- Prevent silent navigation during an active session.
+- Restoration count and aggregate approval count.
+- Selectable restoration rows.
+- Add-restoration controls.
+- Active restoration details and actions.
+- Per-restoration messages and diagnostics.
+- Aggregate Step 3 completion.
 
 ## Implementation Phases
 
-### Phase 1 — Documentation Approval
+### Phase 1 — Documentation Revision
 
-1. Review and approve the PRD.
-2. Review and approve all decision records.
-3. Review and approve this plan.
-4. Review and approve the task checklist.
-5. Review and approve the verification procedure.
+1. Supersede the single-restoration decision.
+2. Accept the multiple-restoration decision.
+3. Revise PRD, plan, tasks, and verification.
 
-No production Step 3 implementation begins before the documentation set is accepted.
+### Phase 2 — Collection State
 
-### Phase 2 — Existing Lifecycle Correction
+1. Add restoration PropertyGroup.
+2. Add collection and active index.
+3. Add aggregate synchronization.
+4. Retain legacy fields for migration.
 
-1. Ensure a case reset explicitly clears all Step 2 state.
-2. Add dependency-aware clearing for future Step 3 state.
-3. Verify reset removes only confirmed B-Dental-managed content.
-4. Re-run current Step 1 and Step 2 lifecycle scenarios.
+### Phase 3 — Ownership and Migration
 
-### Phase 3 — Step 3 State and Migration
+1. Scope metadata to restoration items.
+2. Recover margins by restoration ID.
+3. Add duplicate target rejection.
+4. Migrate earlier single-restoration branch state.
 
-1. Add Step 3 navigation and status values.
-2. Add restoration properties.
-3. Add target arch and FDI tooth properties.
-4. Add margin pointer, session, candidate, review, and diagnostic properties.
-5. Add serialized session and approved point snapshots.
-6. Add safe defaults for v0.0.3 scenes.
-7. Add clear and invalidation helpers.
+### Phase 4 — Geometry, Validation, and Sessions
 
-### Phase 4 — Restoration Identity and Managed Artifacts
+1. Pass restoration explicitly to geometry helpers.
+2. Validate each restoration independently.
+3. Snapshot and restore independent sessions.
+4. Monitor every restoration dependency.
 
-1. Implement permanent FDI arch constraints.
-2. Implement stable restoration identity.
-3. Implement `B-Dental Restorations` collection management.
-4. Implement managed margin metadata.
-5. Implement safe margin lookup and removal.
-6. Implement target-scan signatures.
-7. Verify unrelated objects remain untouched.
+### Phase 5 — Operators and UI
 
-### Phase 5 — Restoration Setup Workflow
+1. Add restoration creation.
+2. Add selection with session gating.
+3. Add confirmed removal.
+4. Scope all margin operators to active restoration.
+5. Add list and aggregate status UI.
 
-1. Implement Step 3 preconditions.
-2. Implement Single Arch automatic target selection.
-3. Implement Dual Arch and Full Scan Set target selection.
-4. Implement target-tooth filtering.
-5. Implement explicit restoration creation.
-6. Implement confirmed setup changes when a margin exists.
-7. Implement setup persistence.
+### Phase 6 — Verification
 
-### Phase 6 — Margin Curve Core
-
-1. Implement managed 3D `POLY` curve creation.
-2. Implement target-local point storage.
-3. Implement ordered spline updates.
-4. Implement cyclic closure.
-5. Implement visible bevel settings.
-6. Implement point serialization.
-7. Verify scan mesh data remains unchanged.
-
-### Phase 7 — Modal Manual Drawing
-
-1. Implement a Viewport modal operator.
-2. Implement target-only ray casting.
-3. Implement accepted-hit conversion to target-local points.
-4. Implement live open-path display.
-5. Implement remove-last-point behavior.
-6. Implement explicit finish and cancel behavior.
-7. Enforce minimum point requirements.
-8. Handle missing viewport, stale target, and operator exceptions safely.
-
-### Phase 8 — Reversible Session Safety
-
-1. Snapshot existing margin and state.
-2. Implement new-draft and existing-margin session paths.
-3. Implement exact reset.
-4. Implement exact cancel.
-5. Implement candidate application.
-6. Ensure candidate application does not approve Step 3.
-7. Add failure rollback.
-8. Prevent silent navigation during an active session.
-
-### Phase 9 — Editing and Reprojection
-
-1. Provide a supported edit path for the managed margin.
-2. Validate that the active artifact remains the expected curve.
-3. Reproject edited points to the target preparation surface.
-4. Reject unsupported additional splines or changed spline types.
-5. Recapture edited points as a candidate.
-6. Invalidate previous approval after material edits.
-
-### Phase 10 — Validation and Diagnostics
-
-1. Define structured validation results.
-2. Implement managed-object and metadata validation.
-3. Implement curve-structure validation.
-4. Implement unique-point and finite-coordinate validation.
-5. Implement closure and path-length validation.
-6. Implement target-surface distance diagnostics.
-7. Implement spacing warnings.
-8. Implement approximate self-proximity warnings.
-9. Separate blocking errors and warnings.
-10. Display point count, path length, and surface-distance metrics.
-
-### Phase 11 — Explicit Approval
-
-1. Add warning acknowledgment.
-2. Add visual-review confirmation.
-3. Implement explicit approval.
-4. Store approved point and target signatures.
-5. Store diagnostics and summary.
-6. Set `step_3_valid = true` only after approval.
-7. Preserve the approved margin visibly.
-
-### Phase 12 — Invalidation and Monitoring
-
-1. Invalidate Step 3 after Step 1 invalidation.
-2. Invalidate Step 3 after Step 2 invalidation.
-3. Remove a margin only when its target scan is removed or replaced.
-4. Preserve usable geometry during temporary upstream invalidation.
-5. Detect material approved-margin edits.
-6. Detect target metadata mismatch.
-7. Detect target-scan signature changes.
-8. Verify persistence after save and reopen.
-
-### Phase 13 — Packaging and UI Completion
-
-1. Register new modules and classes deterministically.
-2. Unregister in reverse order.
-3. Update manifest version to `0.0.4`.
-4. Add required modules to build paths.
-5. Complete Step 3 sidebar UI.
-6. Verify normal-width readability.
-7. Verify repeated enable, disable, and reload behavior.
-
-### Phase 14 — Verification and Completion
-
-1. Validate the manifest.
-2. Build and inspect the `0.0.4` package.
-3. Install and enable from disk.
-4. Verify v0.0.3 migration.
-5. Re-run Step 1 and Step 2 regressions.
-6. Execute every Step 3 scenario in `VERIFICATION.md`.
-7. Record actual results and deviations.
-8. Update PRD and plan status only after acceptance.
-9. Mark tasks complete only after implementation or verification.
-10. Update README and prepare a non-draft pull request for squash merge.
+1. Validate and build package.
+2. Verify v0.0.3 and single-restoration branch migration.
+3. Re-run Step 1 and Step 2 regressions.
+4. Verify multiple upper restorations.
+5. Verify mixed upper and lower restorations.
+6. Verify duplicate rejection.
+7. Verify independent drawing, edit, validation, approval, removal, persistence, and invalidation.
+8. Record actual results.
 
 ## Safety Requirements
 
-- Registration and enablement must not modify the scene.
-- Entering Step 3 must not modify scans.
-- Imported mesh coordinates and topology remain unchanged.
-- Surface picking must target only the selected preparation scan.
-- Reset and cancel restore exact session-start margin points.
-- Failed operators must not leave partial approved state.
-- Changing restoration setup must not remove unrelated objects.
-- Upstream invalidation must not silently claim Step 3 completion.
-- Metrics and warnings must not be presented as clinical proof.
-- Approval must remain explicit.
-
-## Planned Deviations Process
-
-If implementation reveals a necessary architectural deviation:
-
-1. Stop expansion beyond the accepted behavior.
-2. Update the relevant decision record.
-3. Update the PRD when user-visible behavior changes.
-4. Update this plan and task checklist.
-5. Add or update verification scenarios.
-6. Resume implementation only after the revised documentation is accepted.
+- Adding or switching restorations never changes scans.
+- Margin operations affect only the active restoration.
+- Removing one restoration preserves all others.
+- Case reset removes only B-Dental-managed content.
+- Imported topology and coordinates remain unchanged.
+- Failed operators leave no false approval.
+- Aggregate completion is never inferred from only the active restoration.
 
 ## Completion Definition
 
 This plan is complete only when:
 
-- Every accepted requirement is implemented.
-- Every required task is complete.
-- All verification scenarios pass locally.
+- Multiple restorations coexist and persist.
+- Upper and lower restorations coexist in one case.
+- Every margin workflow is independently reversible.
+- Duplicate target teeth are rejected.
+- Aggregate Step 3 validity requires all restorations to be approved.
 - Step 1 and Step 2 remain regression-free.
-- The margin workflow is reversible and scan-safe.
-- Approval is explicit and persistent.
-- Actual implementation deviations are documented.
-- The package is ready for a non-draft pull request and **Squash and merge**.
+- The revised verification matrix passes locally.
+- Actual implementation results and deviations are documented.
+
+## Current Implementation Status
+
+The collection state, ownership, migration, geometry, validation, session, operator, and UI changes have been implemented on the target branch. Blender package validation and the complete manual verification matrix remain pending.
