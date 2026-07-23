@@ -5,21 +5,21 @@ This document records the validation, build, installation, and manual acceptance
 ## Prerequisites
 
 - Windows with PowerShell.
-- Blender 4.2 or newer.
+- Blender 4.2 or newer. The current development environment uses Blender 5.0.
 - The repository checked out on `feat/v0.0.1-foundation`.
 - Commands run from the repository root.
 
 Set the Blender executable path for the installed Blender version:
 
 ```powershell
-$Blender = "C:\Program Files\Blender Foundation\Blender 4.2\blender.exe"
+$Blender = "C:\Program Files\Blender Foundation\Blender 5.0\blender.exe"
 
 if (-not (Test-Path $Blender)) {
     throw "Blender executable was not found at: $Blender"
 }
 ```
 
-Change the path if Blender is installed elsewhere or a newer supported version is being used.
+Change the path if Blender is installed elsewhere.
 
 ## Validate the Extension
 
@@ -33,14 +33,23 @@ if ($LASTEXITCODE -ne 0) {
 }
 ```
 
-Expected result: Blender reports that the extension metadata and package are valid.
+Expected result:
+
+```text
+Success parsing TOML in ".\extension"
+```
 
 ## Build the Extension Package
 
 Create a clean output directory and build the distributable ZIP archive:
 
 ```powershell
+$SourceDirectory = Join-Path $PWD "extension"
 $OutputDirectory = Join-Path $PWD "dist"
+
+if (-not (Test-Path $SourceDirectory)) {
+    throw "Extension directory was not found at: $SourceDirectory"
+}
 
 if (Test-Path $OutputDirectory) {
     Remove-Item $OutputDirectory -Recurse -Force
@@ -48,18 +57,24 @@ if (Test-Path $OutputDirectory) {
 
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 
-& $Blender --command extension build `
-    --source-dir ".\extension" `
-    --output-dir $OutputDirectory
+& $Blender --command extension build --source-dir $SourceDirectory --output-dir $OutputDirectory
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Blender extension build failed."
+    throw "Blender extension build failed with exit code $LASTEXITCODE."
 }
 
-Get-ChildItem $OutputDirectory -Filter "*.zip"
+$Package = Get-ChildItem $OutputDirectory -Filter "*.zip" |
+    Select-Object -First 1
+
+if (-not $Package) {
+    throw "Build completed, but no ZIP package was found."
+}
+
+Write-Host "Extension package created successfully:"
+Write-Host $Package.FullName
 ```
 
-Expected output:
+Expected output package:
 
 ```text
 b_dental-0.0.1.zip
@@ -72,16 +87,11 @@ __init__.py
 blender_manifest.toml
 ```
 
+The manifest is included automatically by Blender's extension builder. It must not be listed inside `[build].paths`.
+
 Inspect the archive contents with PowerShell:
 
 ```powershell
-$Package = Get-ChildItem $OutputDirectory -Filter "b_dental-0.0.1.zip" |
-    Select-Object -First 1
-
-if (-not $Package) {
-    throw "The expected extension package was not created."
-}
-
 $InspectionDirectory = Join-Path $OutputDirectory "inspection"
 
 if (Test-Path $InspectionDirectory) {
@@ -89,69 +99,68 @@ if (Test-Path $InspectionDirectory) {
 }
 
 Expand-Archive -Path $Package.FullName -DestinationPath $InspectionDirectory
+
 Get-ChildItem $InspectionDirectory -Recurse -File |
-    ForEach-Object { $_.FullName.Substring($InspectionDirectory.Length + 1) }
+    ForEach-Object {
+        $_.FullName.Substring($InspectionDirectory.Length + 1)
+    }
 ```
 
 ## Install Locally Through Blender
 
-1. Open Blender.
+1. Open Blender 5.0.
 2. Open **Edit > Preferences**.
-3. Select **Get Extensions** or **Add-ons**, depending on the Blender version and preferences layout.
-4. Open the extension menu in the upper-right corner.
-5. Choose **Install from Disk**.
+3. Select **Get Extensions**.
+4. Open the menu in the upper-right corner.
+5. Select **Install from Disk**.
 6. Select `dist\b_dental-0.0.1.zip`.
-7. Confirm installation and enable **B-Dental** if it is not enabled automatically.
+7. Enable B-Dental if Blender does not enable it automatically.
 
 ## Manual Acceptance Test
 
-### Enable and Display
-
 1. Open a 3D Viewport.
 2. Press `N` to open the sidebar.
-3. Confirm that a tab labeled `B-Dental` is visible.
-4. Select the `B-Dental` tab.
-5. Confirm that a panel labeled `B-Dental` appears.
-6. Confirm that the panel displays exactly:
+3. Select the `B-Dental` tab.
+4. Confirm that the panel label is `B-Dental`.
+5. Confirm that the panel displays exactly:
 
 ```text
 Not Implemented Yet.
 ```
 
-### Disable and Re-enable
+6. Open **Edit > Preferences > Get Extensions**.
+7. Disable B-Dental.
+8. Confirm that the `B-Dental` sidebar tab disappears.
+9. Enable B-Dental again.
+10. Confirm that the tab and placeholder return without duplicate-registration errors.
 
-1. Return to **Edit > Preferences**.
-2. Disable B-Dental.
-3. Return to the 3D Viewport and confirm that the `B-Dental` tab is removed.
-4. Re-enable B-Dental.
-5. Confirm that the tab, panel, and placeholder return.
-6. Repeat the disable and enable cycle once more.
-7. Confirm that no duplicate-class registration error appears.
+## Console Review
 
-### Console Review
+During enable, disable, and re-enable testing, review Blender's console for:
 
-On Windows, open Blender's system console through **Window > Toggle System Console**.
+- Manifest errors.
+- Python import errors.
+- Class registration errors.
+- Duplicate registration errors.
+- Class unregistration errors.
 
-Confirm that installation, enablement, disablement, and re-enablement produce no Python traceback, registration error, runtime error, or cleanup error.
+The acceptance test passes only when no B-Dental-related error is reported.
 
-## Acceptance Record
+## Verification Record
 
-Record the local result before merging:
+Record the local result before marking the remaining tasks complete:
 
-- Blender version:
-- Operating system:
-- Manifest validation: Pass / Fail
-- Package build: Pass / Fail
-- Local installation: Pass / Fail
-- Initial enablement: Pass / Fail
-- B-Dental tab visible: Pass / Fail
-- B-Dental panel visible: Pass / Fail
-- Placeholder exact: Pass / Fail
-- Disable cleanup: Pass / Fail
-- Re-enable cycle: Pass / Fail
-- Console clean: Pass / Fail
-- Tester:
-- Date:
-- Notes:
-
-All checks must pass before the remaining local-verification tasks and PRD acceptance criteria are marked complete.
+```text
+Blender version:
+Validation result:
+Build result:
+Built package:
+Installation result:
+Enable result:
+Panel result:
+Disable result:
+Re-enable result:
+Console errors:
+Tester:
+Date:
+```
