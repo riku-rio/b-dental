@@ -17,5 +17,4 @@ license = [
 [build]
 paths = [
   "__init__.py",
-  "blender_manifest.toml",
 ]
