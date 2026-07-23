@@ -10,11 +10,11 @@
 - **Minimum Blender version:** 4.2
 - **Result:** Not executed
 
-This document defines the required validation, build, migration, regression, margin-session, safety, persistence, and acceptance scenarios for Step 3 — Restoration Setup & Manual Margin Definition.
+This document defines the required package, migration, regression, multiple-restoration, margin-session, safety, persistence, and acceptance checks for Step 3.
 
-All dental fixtures used for verification must be de-identified.
+Use only de-identified dental fixtures.
 
-## PowerShell Validation and Build Commands
+## PowerShell Validation and Build
 
 ```powershell
 $ErrorActionPreference = "Stop"
@@ -34,17 +34,14 @@ if ($LASTEXITCODE -ne 0) {
     throw "Blender extension validation failed."
 }
 
-$SourceDirectory = Join-Path $PWD "extension"
 $OutputDirectory = Join-Path $PWD "dist"
-
 if (Test-Path $OutputDirectory) {
     Remove-Item $OutputDirectory -Recurse -Force
 }
-
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 
 & $Blender --command extension build `
-    --source-dir $SourceDirectory `
+    --source-dir ".\extension" `
     --output-dir $OutputDirectory
 
 if ($LASTEXITCODE -ne 0) {
@@ -55,64 +52,50 @@ $Package = Get-ChildItem $OutputDirectory -Filter "b_dental-0.0.4.zip" |
     Select-Object -First 1
 
 if (-not $Package) {
-    throw "The expected v0.0.4 package was not created."
+    throw "The expected b_dental-0.0.4.zip package was not created."
 }
 
 $InspectDirectory = Join-Path $OutputDirectory "inspect-v0.0.4"
 if (Test-Path $InspectDirectory) {
     Remove-Item $InspectDirectory -Recurse -Force
 }
-
 Expand-Archive $Package.FullName $InspectDirectory
 Get-ChildItem $InspectDirectory -Recurse | Select-Object FullName
 ```
 
-## Package Verification
+## Package Result
 
 Record after execution:
 
 - Manifest validation: **Pending**
 - Extension build: **Pending**
-- Expected package: `b_dental-0.0.4.zip`
 - Package inspection: **Pending**
-- Installation from disk: **Pending**
-- Extension enablement: **Pending**
-- B-Dental registration errors: **Pending**
+- Installation: **Pending**
+- Enablement: **Pending**
+- Registration errors: **Pending**
 
-Required packaged modules are expected to include:
+Expected Step 3 modules:
 
 ```text
-__init__.py
-alignment.py
-blender_manifest.toml
 margin_geometry.py
 margin_validation.py
-occlusion_validation.py
-operators.py
-properties.py
 restoration_utils.py
-scene_utils.py
 step_three_operators.py
 step_three_session.py
-step_two_operators.py
-step_two_session.py
-ui.py
-validation.py
 ```
 
-## Baseline Capture Rules
+## Safety Baseline
 
-Before each transform or mesh-safety scenario, record:
+Before scenarios involving restoration operations, record:
 
-- Object world matrices.
+- Every scan world matrix.
 - Mesh data-block identity.
-- Vertex count.
-- Edge count.
-- Polygon count.
-- A deterministic sample or checksum of vertex coordinates.
-- Existing unrelated scene objects and collections.
+- Vertex, edge, and polygon counts.
+- Deterministic coordinate sample or checksum.
+- Existing unrelated objects and collections.
+- Existing restoration IDs, margin object names, and point snapshots.
 
-The result is acceptable only when Step 3 changes are limited to intended B-Dental restoration artifacts and workflow state.
+Only intended workflow state and B-Dental-managed restoration artifacts may change.
 
 ## Scenario Matrix
 
@@ -122,433 +105,236 @@ The result is acceptable only when Step 3 changes are limited to intended B-Dent
 
 Verify:
 
-- A saved v0.0.3 case opens without errors.
-- Step 1 and Step 2 state remains available.
-- New Step 3 properties use safe defaults.
-- `current_step` remains valid.
-- No restoration collection or margin is created during file load.
-- No scan object moves.
-- No scan mesh data changes.
+- Existing Step 1 and Step 2 state opens safely.
+- Restoration collection is empty.
+- Active index is safe.
+- No collection or margin is created automatically.
+- No scan changes.
 
-### 2. Registration and Enablement Safety
+### 2. Earlier Single-Restoration v0.0.4 Migration
+
+**Status: Pending**
+
+Using a file saved with the earlier branch implementation, verify:
+
+- One legacy restoration becomes one collection item.
+- Stable ID, arch, FDI tooth, margin pointer, diagnostics, and approval snapshots are preserved.
+- Migration occurs once.
+- The migrated restoration can be selected, edited, validated, and approved.
+
+### 3. Registration and Lifecycle
 
 **Status: Pending**
 
 Verify:
 
-- Enabling the extension does not create a case.
-- Enabling the extension does not create a restoration.
-- Enabling the extension does not create a margin.
-- Existing scene objects and transforms remain unchanged.
-- Repeated enable and disable cycles produce no B-Dental errors.
-- Script reload does not duplicate handlers or properties.
+- Enablement creates no case or restoration.
+- Repeated enable/disable produces no errors.
+- Script reload does not duplicate properties or handlers.
+- Registration does not modify scene objects.
 
-### 3. Step 1 Regression
+### 4. Step 1 Regression
 
 **Status: Pending**
 
-Re-run:
+Re-run Single Arch upper/lower, Dual Arch, Full Scan Set, import cancellation, replacement failure, scan removal, validation, persistence, and reset scenarios.
 
-- Start New Dental Case.
-- Single Arch upper workflow.
-- Single Arch lower workflow.
-- Dual Arch workflow.
-- Full Scan Set workflow.
-- Import cancellation.
-- Failed replacement safety.
-- Missing-role validation.
-- Scan replacement and removal.
-- Save and reopen.
-
-### 4. Step 2 Regression
+### 5. Step 2 Regression
 
 **Status: Pending**
 
-Re-run:
+Re-run imported, manual, Right Bite, Left Bite, Both Bites, reset, cancel, verification, approval, persistence, and invalidation scenarios.
 
-- Single Arch not-applicable completion.
-- Imported relationship analysis.
-- Manual alignment reset and cancel.
-- Manual candidate application.
-- Right Bite registration.
-- Left Bite registration.
-- Both Bites registration.
-- Candidate verification and approval.
-- Approval persistence.
-- Transform-change invalidation.
+### 6. Step 3 Entry
 
-### 5. Step 3 Entry Gating
+**Status: Pending**
+
+Verify Step 3 gating, unchanged scans, empty restoration list for a fresh case, and no automatic restoration creation.
+
+### 7. Add First Restoration
 
 **Status: Pending**
 
 Verify:
 
-- Step 3 is unavailable before Step 2 completion.
-- Single Arch requires explicit Step 2 not-applicable completion.
-- Dual Arch and Full Scan Set require verified Step 2.
-- Entering Step 3 preserves all scan transforms.
-- Entering Step 3 preserves all scan mesh data.
-- Entering Step 3 does not set `step_3_valid`.
+- Single Arch constrains the arch automatically.
+- Dual/Full cases expose available upper and lower arches.
+- FDI choices match the selected arch.
+- Add creates one stable ID.
+- Status becomes `READY_FOR_MARGIN`.
 
-### 6. Existing Case Reset Correction
-
-**Status: Pending**
-
-Verify:
-
-- Reset clears Step 1, Step 2, and Step 3 workflow state.
-- Reset clears active sessions.
-- Reset removes confirmed B-Dental-managed scans and restoration artifacts.
-- Reset preserves unrelated objects, curves, collections, and meshes.
-- No old Step 2 metrics or approval state survives the reset.
-
-### 7. Single Arch Restoration Setup
+### 8. Add Multiple Upper Restorations
 
 **Status: Pending**
 
-Verify separately for upper and lower Single Arch cases:
+Add at least FDI 11 and FDI 14. Verify independent IDs, independent rows, independent state, and no scan changes.
 
-- Target arch is selected automatically.
-- The unavailable arch cannot be selected.
-- Only FDI teeth belonging to the imported arch are available.
-- A target tooth is required.
-- Creating the restoration produces one stable restoration ID.
-- Save and reopen preserves setup.
-
-### 8. Dual Arch and Full Scan Set Restoration Setup
+### 9. Mixed Upper and Lower Restorations
 
 **Status: Pending**
 
-Verify:
+In a Dual Arch or Full Scan Set case:
 
-- Upper Jaw and Lower Jaw are available only when live managed scans exist.
-- Selecting Upper Jaw exposes only upper permanent FDI teeth.
-- Selecting Lower Jaw exposes only lower permanent FDI teeth.
-- Invalid arch-tooth combinations are unavailable or rejected.
-- The restoration type remains Anatomical Crown.
-- Only one active restoration is exposed.
+- Add an upper restoration.
+- Add a lower restoration.
+- Confirm both remain listed simultaneously.
+- Confirm each resolves its correct preparation scan.
+- Confirm switching preserves both.
 
-### 9. Confirmed Setup Changes
-
-**Status: Pending**
-
-Verify:
-
-- Changing arch or tooth without a margin updates setup safely.
-- Changing arch or tooth with a margin requires confirmation.
-- Cancelling confirmation preserves setup and margin.
-- Confirming removes only the active restoration's managed margin.
-- Unrelated curves and objects remain unchanged.
-- A new stable setup can be created after the change.
-
-### 10. Start New Margin Session
+### 10. Duplicate Target Rejection
 
 **Status: Pending**
 
-Verify:
+Attempt to add the same arch and FDI tooth twice. Verify rejection without modifying the existing restoration.
 
-- Session start revalidates upstream state and setup.
-- Session start creates or reuses only the active restoration margin.
-- The margin belongs to `B-Dental Restorations`.
-- Required ownership metadata is present.
-- Scan transforms remain unchanged.
-- Scan mesh identity, topology, and coordinates remain unchanged.
-- Status becomes `DRAWING`.
-- Step 3 remains invalid.
-
-### 11. Target-Only Surface Picking
+### 11. Active Restoration Switching
 
 **Status: Pending**
 
-Verify using visible overlapping objects:
+Verify selection changes only the active index and displays the correct target, status, margin, diagnostics, and approval state.
 
-- Clicking the target preparation scan adds a point.
-- Clicking the antagonist does not add a point.
-- Clicking a bite scan does not add a point.
-- Clicking the margin does not add a point.
-- Clicking an unrelated mesh does not add a point.
-- Clicking empty space does not add a point.
-- Accepted points lie on the target scan and are stored in target-local coordinates.
-
-### 12. Modal Drawing Controls
+### 12. Switch Gating During Session
 
 **Status: Pending**
 
-Verify:
+Start drawing or editing one margin. Attempt to select another restoration. Verify switching is blocked until Apply or Cancel.
 
-- The UI or status bar displays active controls.
-- Accepted clicks add ordered points.
-- Remove-last removes only the most recent point.
-- Finish is rejected below the minimum point count.
-- Cancel exits without an approved result.
-- A missing or closed 3D Viewport fails safely.
-- A stale target during drawing fails safely.
-
-### 13. Candidate Closure
+### 13. Independent Margin Creation
 
 **Status: Pending**
 
-Verify:
+Draw margins for two restorations. Verify:
 
-- Six or more unique finite points can be finished.
-- Finish creates one 3D `POLY` spline.
-- The spline is cyclic.
-- The point order matches drawing order.
-- Status becomes `CANDIDATE`.
-- `step_3_valid` remains false.
-- The curve has a visible viewport bevel.
+- Separate Curve objects.
+- Separate restoration metadata.
+- Correct target parents.
+- Correct local points.
+- No shared spline or pointer.
 
-### 14. New-Draft Reset and Cancel
+### 14. Target-Only Picking
 
 **Status: Pending**
 
-Verify:
+For upper and lower active restorations separately, verify only the active preparation scan accepts clicks. Antagonist, other margins, bite scans, unrelated meshes, and empty space must not add points.
 
-- Reset restores the exact session-start empty draft state and keeps the session active.
-- Cancel removes the new draft margin.
-- Cancel restores the prior Step 3 status and validity.
-- No scan object changes.
-- No unrelated object changes.
-
-### 15. Existing-Margin Reset and Cancel
+### 15. Modal Controls
 
 **Status: Pending**
 
-Verify:
+Verify LMB add, Backspace/Ctrl+Z remove, Enter/RMB close, Esc cancel, minimum-point enforcement, status instructions, and drawing from the Sidebar button through the viewport window region.
 
-- Starting from an applied margin snapshots exact ordered points.
-- Starting from an approved margin snapshots approval state.
-- Reset restores exact session-start points.
-- Cancel restores exact session-start points.
-- Cancel restores prior status, validity, diagnostics, and approval.
-- No extra spline or duplicate margin remains.
-
-### 16. Apply Candidate
+### 16. Independent Reset and Cancel
 
 **Status: Pending**
 
-Verify:
+With two restorations present, reset and cancel one active session. Verify exact restoration of its state and zero changes to the other restoration.
 
-- Apply keeps the current closed candidate.
-- Apply closes the session.
-- Apply clears previous review confirmation and warning acknowledgment.
-- Apply invalidates prior approval.
-- Apply sets status to `CANDIDATE`.
-- Apply does not set `step_3_valid`.
-
-### 17. Editing and Reprojection
+### 17. Independent Apply
 
 **Status: Pending**
 
-Verify:
+Apply one candidate. Verify its session closes and approval remains false while the other restoration is unchanged.
 
-- The managed margin can be selected and edited through the supported path.
-- Moving points off the surface is detected.
-- Reprojection places points back on the target preparation surface.
-- Reprojection never uses the antagonist or unrelated geometry.
-- Ordered point count is preserved where applicable.
-- Recapture produces a valid candidate.
-- Material edits invalidate approval.
-
-### 18. Unsupported Curve Structures
+### 18. Independent Editing and Reprojection
 
 **Status: Pending**
 
-Verify blocking behavior for:
+Edit and reproject each arch separately. Verify reprojection uses only the owning target scan and does not change the other margin.
 
-- Missing margin object.
-- Unmanaged replacement curve.
-- Wrong restoration ID.
-- Wrong target role.
-- Wrong target tooth.
-- Multiple splines.
-- Bézier or NURBS spline.
-- Non-cyclic spline.
-- Fewer than six unique points.
-- Non-finite point coordinates.
-- Collapsed consecutive points.
-
-### 19. Surface-Distance Diagnostics
+### 19. Per-Restoration Validation
 
 **Status: Pending**
 
-Verify:
+Verify structure, unique points, finite coordinates, closure, path, surface distance, spacing, and proximity diagnostics are stored only on the active restoration.
 
-- Points on or near the target surface pass distance checks.
-- A point beyond `0.25 mm` produces a warning.
-- A point beyond `1.0 mm` produces a blocking error.
-- Mean and maximum distances are displayed in millimeters.
-- Diagnostics use the evaluated target preparation surface.
-
-### 20. Path and Spacing Diagnostics
+### 20. Independent Approval
 
 **Status: Pending**
 
-Verify:
+Approve one restoration and leave another as Candidate. Verify:
 
-- Point count is displayed.
-- Closed path length is displayed in millimeters.
-- Fewer than twelve points produces a warning.
-- Abnormal spacing variation produces a warning.
-- Approximate non-adjacent proximity can produce a possible-fold warning.
-- Diagnostic warnings do not claim clinical incorrectness.
+- First restoration remains verified.
+- Second remains unverified.
+- Aggregate `step_3_valid` remains false.
+- Approved count is correct.
 
-### 21. Explicit Review and Approval
+### 21. Aggregate Completion
 
 **Status: Pending**
 
-Verify:
+Approve every configured restoration. Verify aggregate status becomes `VERIFIED` and `step_3_valid = true` only after the final approval.
 
-- Blocking errors prevent approval.
-- Warnings require acknowledgment.
-- Visual-review confirmation is required.
-- Candidate creation alone does not approve.
-- Validation alone does not approve.
-- Approval sets `step_3_status = VERIFIED`.
-- Approval sets `step_3_valid = true`.
-- Approved local-space points and target signature are stored.
-- The approved margin remains visible.
-- The UI states that diagnostics are not clinical certification.
-
-### 22. Approval Persistence
+### 22. Add After Aggregate Completion
 
 **Status: Pending**
 
-Verify after save and reopen:
+After Step 3 is verified, add another restoration. Verify aggregate validity becomes false while existing approvals remain intact.
 
-- Restoration ID persists.
-- Target arch and tooth persist.
-- Margin pointer resolves safely.
-- Margin point order and cyclic state persist.
-- Approved point snapshot persists.
-- Diagnostics and summary persist.
-- `step_3_status` and `step_3_valid` persist.
-
-### 23. Margin-Edit Invalidation
+### 23. Remove One Restoration
 
 **Status: Pending**
 
-Verify:
+With multiple restorations:
 
-- Moving an approved point materially invalidates Step 3.
-- Adding or deleting a point invalidates Step 3.
-- Changing curve metadata invalidates or errors safely.
-- Review confirmation and warning acknowledgment are cleared.
-- Structurally usable edited geometry becomes `CANDIDATE`.
-- Structurally unusable edited geometry becomes `ERROR`.
+- Remove one after confirmation.
+- Confirm only its managed margin is deleted.
+- Confirm all other items, margins, diagnostics, and approvals remain intact.
+- Confirm active index remains valid.
 
-### 24. Step 2 Invalidation
+### 24. Removal and Aggregate Recalculation
 
 **Status: Pending**
 
-Verify:
+Remove an unapproved restoration while all remaining restorations are approved. Verify aggregate Step 3 becomes verified. Remove the last restoration and verify Step 3 becomes setup-required and invalid.
 
-- Invalidating Step 2 invalidates Step 3 approval.
-- Step 3 becomes `UPSTREAM_INVALID` when geometry remains usable.
-- Restoration setup remains preserved.
-- Margin geometry remains preserved when the target scan remains live.
-- Re-completing Step 2 does not silently reapprove Step 3.
-- Step 3 validation and approval must be rerun.
-
-### 25. Target Scan Removal and Replacement
+### 25. Persistence
 
 **Status: Pending**
 
-Verify:
+Save and reopen a case containing multiple upper/lower restorations at mixed statuses. Verify collection order, active index, IDs, target data, margins, diagnostics, and approvals persist.
 
-- Removing the target scan invalidates Step 1, Step 2, and Step 3.
-- The dependent managed margin is removed safely.
-- Replacing the target scan removes the old dependent margin.
-- A margin for an unrelated future restoration is not removed by broad cleanup.
-- Unrelated scene content remains unchanged.
-
-### 26. Non-Target Scan Changes
+### 26. Independent Margin-Edit Invalidation
 
 **Status: Pending**
 
-Verify:
+Edit one approved margin. Verify only its approval is invalidated and aggregate validity recalculates while other approvals remain.
 
-- Changes to a non-target arch follow upstream invalidation rules.
-- Usable target-linked margin geometry is preserved when safe.
-- Step 3 approval is invalidated when Step 2 no longer verifies the case.
-- No margin is silently reparented or retargeted.
-
-### 27. Scan Transform and Mesh Safety
+### 27. Upstream Invalidation
 
 **Status: Pending**
 
-Compare baseline and final values after all Step 3 actions:
+Invalidate Step 1 or Step 2. Verify every restoration approval becomes invalid, statuses become upstream-invalid as appropriate, and usable geometry remains preserved when target scans remain.
 
-- Target scan world matrix.
-- Non-target scan world matrices.
-- Mesh data-block identity.
-- Vertex count.
-- Edge count.
-- Polygon count.
-- Deterministic vertex-coordinate sample or checksum.
-
-All must remain unchanged unless an explicitly tested upstream Step 1 or Step 2 action is responsible for the change.
-
-### 28. Navigation Safety
+### 28. Target Scan Replacement
 
 **Status: Pending**
 
-Verify:
+Replace Upper Jaw in a case with upper and lower restorations. Verify upper-dependent restorations invalidate or lose dependent margins safely while lower restorations remain preserved.
 
-- Back to Step 2 works when no session is active.
-- Active sessions cannot be abandoned silently.
-- Reset, Cancel, or Apply resolves the session before navigation.
-- Applied or approved margins remain preserved when navigating back.
-- Returning to Step 3 restores the correct state.
-
-### 29. UI Readability
+### 29. Metadata Corruption
 
 **Status: Pending**
 
-Verify at normal Blender sidebar width:
+Corrupt one margin restoration ID, arch, or tooth metadata. Verify only the owning restoration errors and unrelated restoration objects remain untouched.
 
-- `Step 1 of 3`, `Step 2 of 3`, and `Step 3 of 3` display correctly.
-- Restoration setup is understandable.
-- Target arch and tooth constraints are clear.
-- Session actions are context-sensitive.
-- Drawing instructions are readable.
-- Errors and warnings wrap correctly.
-- Diagnostics remain readable.
-- Approval controls are unambiguous.
-
-### 30. Lifecycle and Console Cleanliness
+### 30. Case Reset
 
 **Status: Pending**
 
-Verify:
+Verify confirmed reset removes all B-Dental-managed restoration margins and state while preserving unrelated curves, meshes, and collections.
 
-- Repeated enable and disable cycles.
-- Repeated session start, reset, cancel, and apply cycles.
-- Repeated file save and reopen.
-- Repeated target focus and visibility actions.
-- No duplicate modal handlers.
-- No stale-pointer exceptions.
-- No B-Dental-related console errors during accepted workflows.
+### 31. Scan Safety
+
+**Status: Pending**
+
+Across all scenarios confirm world matrices, mesh identity, topology, and vertex coordinates remain unchanged except for explicitly permitted Step 2 transforms.
+
+### 32. UI Readability
+
+**Status: Pending**
+
+At normal Sidebar width verify restoration rows, active status, add controls, margin actions, diagnostics, approval controls, approved count, and aggregate completion remain readable.
 
 ## Acceptance Record
 
-Complete only after implementation and execution:
-
-1. Manifest validation and package build: **Pending**
-2. Installation and enablement: **Pending**
-3. v0.0.3 migration: **Pending**
-4. Step 1 regression: **Pending**
-5. Step 2 regression: **Pending**
-6. Restoration setup scenarios: **Pending**
-7. Manual drawing scenarios: **Pending**
-8. Session rollback scenarios: **Pending**
-9. Editing and reprojection scenarios: **Pending**
-10. Validation and diagnostics: **Pending**
-11. Explicit approval: **Pending**
-12. Persistence and invalidation: **Pending**
-13. Scan transform and mesh safety: **Pending**
-14. Registration lifecycle: **Pending**
-
-## Final Status
-
-Version `v0.0.4` is **not yet verified**. This document must be updated with actual results, deviations, Blender version, package contents, and acceptance evidence before the PRD or plan is marked accepted.
+Do not mark this document Passed until every scenario is executed and actual results are recorded. Any failure requires implementation or documentation correction before v0.0.4 acceptance.
