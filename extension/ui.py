@@ -364,7 +364,9 @@ def _draw_step_three(layout, state, context) -> None:
         row.operator("bdental.cancel_margin_session", text="Cancel", icon="CANCEL")
     else:
         if margin is None:
-            margin_box.operator("bdental.draw_margin", text="Draw Manual Margin", icon="GREASEPENCIL")
+            draw_row = margin_box.row()
+            draw_row.operator_context = "INVOKE_REGION_WIN"
+            draw_row.operator("bdental.draw_margin", text="Draw Manual Margin", icon="GREASEPENCIL")
         else:
             margin_box.label(text=f"{len(margin.data.splines[0].points) if len(margin.data.splines) == 1 else 0} curve points")
             row = margin_box.row(align=True)
@@ -374,7 +376,9 @@ def _draw_step_three(layout, state, context) -> None:
                 text="Show" if margin.hide_viewport else "Hide",
                 icon="HIDE_ON" if margin.hide_viewport else "HIDE_OFF",
             )
-            margin_box.operator("bdental.draw_margin", text="Redraw Margin", icon="GREASEPENCIL")
+            redraw_row = margin_box.row()
+            redraw_row.operator_context = "INVOKE_REGION_WIN"
+            redraw_row.operator("bdental.draw_margin", text="Redraw Margin", icon="GREASEPENCIL")
             margin_box.operator("bdental.prepare_margin_edit", text="Edit Margin Points", icon="EDITMODE_HLT")
             margin_box.operator("bdental.reproject_margin", text="Reproject Margin Points", icon="MOD_SHRINKWRAP")
             margin_box.operator("bdental.validate_margin", text="Run Margin Validation", icon="FILE_TICK")
