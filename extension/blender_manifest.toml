@@ -1,0 +1,20 @@
+schema_version = "1.0.0"
+
+id = "b_dental"
+version = "0.0.1"
+name = "B-Dental"
+tagline = "Foundation interface for the B-Dental Blender extension"
+maintainer = "riku-rio"
+type = "add-on"
+website = "https://github.com/riku-rio/b-dental"
+
+blender_version_min = "4.2.0"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+[build]
+paths = [
+  "__init__.py",
+]
