@@ -3,9 +3,9 @@
 import bpy
 from bpy.props import PointerProperty
 
-from . import operators, properties, ui
+from . import operators, properties, step_two_operators, ui
 
-CLASSES = properties.CLASSES + operators.CLASSES + ui.CLASSES
+CLASSES = properties.CLASSES + operators.CLASSES + step_two_operators.CLASSES + ui.CLASSES
 
 
 def register() -> None:
