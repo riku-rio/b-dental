@@ -9,7 +9,7 @@
 - [x] V003-005 Record the fixed-upper and reversible-session decision.
 - [x] V003-006 Record the explicit approval and non-clinical-metrics decision.
 - [x] V003-007 Record the local verification procedure.
-- [ ] V003-008 Review and approve the complete v0.0.3 documentation set.
+- [x] V003-008 Review and approve the complete v0.0.3 documentation set.
 
 ## Project Structure
 
