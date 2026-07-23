@@ -24,25 +24,49 @@ class OcclusionResult:
     overlap_ratio: float = 0.0
 
 
-def matrix_is_rigid(matrix: Matrix, tolerance: float = 1.0e-4) -> bool:
-    """Return whether a matrix has finite, near-unit orthogonal basis vectors."""
+def matrix_uniform_scale(matrix: Matrix, tolerance: float = 1.0e-4) -> float | None:
+    """Return a positive uniform scale when the matrix is finite and shear-free.
+
+    STL import may preserve a legitimate unit-conversion scale such as 0.001.
+    Step 2 accepts that uniform scale while rejecting non-uniform scale, shear,
+    degenerate bases, and reflected transforms.
+    """
 
     if not alignment.matrix_is_finite(matrix):
-        return False
+        return None
 
     basis = [Vector(matrix.col[index][:3]) for index in range(3)]
     if any(not all(isfinite(float(value)) for value in vector) for vector in basis):
-        return False
-    if any(abs(vector.length - 1.0) > tolerance for vector in basis):
-        return False
-    if abs(basis[0].dot(basis[1])) > tolerance:
-        return False
-    if abs(basis[0].dot(basis[2])) > tolerance:
-        return False
-    if abs(basis[1].dot(basis[2])) > tolerance:
-        return False
-    determinant = matrix.to_3x3().determinant()
-    return abs(determinant - 1.0) <= tolerance * 10.0
+        return None
+
+    lengths = [float(vector.length) for vector in basis]
+    if any(length <= 1.0e-12 for length in lengths):
+        return None
+
+    uniform_scale = sum(lengths) / 3.0
+    relative_spread = max(abs(length - uniform_scale) for length in lengths) / uniform_scale
+    if relative_spread > tolerance:
+        return None
+
+    normalized = [vector / length for vector, length in zip(basis, lengths)]
+    if abs(normalized[0].dot(normalized[1])) > tolerance:
+        return None
+    if abs(normalized[0].dot(normalized[2])) > tolerance:
+        return None
+    if abs(normalized[1].dot(normalized[2])) > tolerance:
+        return None
+
+    handedness = normalized[0].cross(normalized[1]).dot(normalized[2])
+    if abs(handedness - 1.0) > tolerance * 10.0:
+        return None
+
+    return uniform_scale
+
+
+def matrix_is_rigid(matrix: Matrix, tolerance: float = 1.0e-4) -> bool:
+    """Return whether a matrix is finite, shear-free, and uniformly scaled."""
+
+    return matrix_uniform_scale(matrix, tolerance) is not None
 
 
 def matrix_distance(first: Matrix, second: Matrix) -> tuple[float, float]:
@@ -54,6 +78,30 @@ def matrix_distance(first: Matrix, second: Matrix) -> tuple[float, float]:
     dot = max(-1.0, min(1.0, abs(first_q.dot(second_q))))
     rotation = float(2.0 * acos(dot))
     return translation, rotation
+
+
+def _append_scale_diagnostics(
+    upper: bpy.types.Object,
+    lower: bpy.types.Object,
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    """Report incompatible jaw scales without rejecting valid unit conversion."""
+
+    upper_scale = matrix_uniform_scale(upper.matrix_world)
+    lower_scale = matrix_uniform_scale(lower.matrix_world)
+    if upper_scale is None or lower_scale is None:
+        return
+
+    scale_ratio = max(upper_scale, lower_scale) / min(upper_scale, lower_scale)
+    if scale_ratio > 1.05:
+        errors.append(
+            "Upper and Lower Jaw use incompatible uniform scales. Re-import both scans with the same source units."
+        )
+    elif scale_ratio > 1.01:
+        warnings.append(
+            "Upper and Lower Jaw uniform scales differ slightly; confirm both scans used the same source units."
+        )
 
 
 def _world_bounds(obj: bpy.types.Object) -> tuple[Vector, Vector]:
@@ -93,7 +141,11 @@ def bounding_box_overlap_ratio(first: bpy.types.Object, second: bpy.types.Object
     second_min, second_max = _world_bounds(second)
     overlap = Vector(
         tuple(
-            max(0.0, min(first_max[index], second_max[index]) - max(first_min[index], second_min[index]))
+            max(
+                0.0,
+                min(first_max[index], second_max[index])
+                - max(first_min[index], second_min[index]),
+            )
             for index in range(3)
         )
     )
@@ -167,8 +219,12 @@ def analyze_imported_relationship(state: bpy.types.PropertyGroup) -> OcclusionRe
     for obj, label in ((upper, "Upper Jaw"), (lower, "Lower Jaw")):
         if not alignment.matrix_is_finite(obj.matrix_world):
             errors.append(f"{label} has a non-finite world matrix.")
-        elif not matrix_is_rigid(obj.matrix_world):
-            errors.append(f"{label} world transform contains scale or shear outside tolerance.")
+        elif matrix_uniform_scale(obj.matrix_world) is None:
+            errors.append(
+                f"{label} world transform contains non-uniform scale, shear, a reflection, or a degenerate basis."
+            )
+
+    _append_scale_diagnostics(upper, lower, errors, warnings)
 
     separation = bounding_box_separation(upper, lower)
     overlap_ratio = bounding_box_overlap_ratio(upper, lower)
@@ -186,8 +242,8 @@ def analyze_imported_relationship(state: bpy.types.PropertyGroup) -> OcclusionRe
         return OcclusionResult(
             ok=False,
             errors=tuple(errors),
-            warnings=tuple(warnings),
-            summary="Imported relationship requires alignment.",
+            warnings=tuple(dict.fromkeys(warnings)),
+            summary="Imported relationship requires alignment or corrected scan units.",
             status="NEEDS_ALIGNMENT",
             separation=separation,
             overlap_ratio=overlap_ratio,
@@ -195,7 +251,7 @@ def analyze_imported_relationship(state: bpy.types.PropertyGroup) -> OcclusionRe
 
     return OcclusionResult(
         ok=True,
-        warnings=tuple(warnings),
+        warnings=tuple(dict.fromkeys(warnings)),
         summary="Imported relationship is a candidate and requires user verification.",
         status="IMPORTED_CANDIDATE",
         separation=separation,
@@ -223,10 +279,16 @@ def verify_candidate(state: bpy.types.PropertyGroup) -> OcclusionResult:
 
     errors: list[str] = []
     warnings: list[str] = []
-    if not matrix_is_rigid(upper.matrix_world):
-        errors.append("Upper Jaw transform is not a finite rigid transform.")
-    if not matrix_is_rigid(lower.matrix_world):
-        errors.append("Lower Jaw transform is not a finite rigid transform.")
+    if matrix_uniform_scale(upper.matrix_world) is None:
+        errors.append(
+            "Upper Jaw transform contains non-uniform scale, shear, a reflection, or invalid values."
+        )
+    if matrix_uniform_scale(lower.matrix_world) is None:
+        errors.append(
+            "Lower Jaw transform contains non-uniform scale, shear, a reflection, or invalid values."
+        )
+
+    _append_scale_diagnostics(upper, lower, errors, warnings)
 
     stored_upper = scene_utils.matrix_from_string(state.session_upper_matrix)
     if stored_upper is not None:
@@ -253,7 +315,7 @@ def verify_candidate(state: bpy.types.PropertyGroup) -> OcclusionResult:
     return OcclusionResult(
         ok=not errors,
         errors=tuple(errors),
-        warnings=tuple(warnings),
+        warnings=tuple(dict.fromkeys(warnings)),
         summary="Candidate passed engineering checks." if not errors else "Candidate verification failed.",
         status="CANDIDATE" if not errors else "ERROR",
         separation=separation,
