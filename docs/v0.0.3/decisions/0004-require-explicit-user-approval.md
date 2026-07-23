@@ -3,92 +3,56 @@
 ## Metadata
 
 - **Version:** v0.0.3
-- **Status:** Proposed
+- **Status:** Accepted
 - **Related requirements:** [`../PRD.md`](../PRD.md)
 - **Related plan:** [`../plans/0001-occlusion-registration-verification.md`](../plans/0001-occlusion-registration-verification.md)
 
 ## Context
 
-Low registration error, apparent visual fit, or successful operator execution does not prove that a maxillomandibular relationship is clinically correct. Scanner acquisition, bite capture, surface noise, and local registration minima can all produce plausible but incorrect results.
-
-The workflow must provide useful geometric feedback without presenting it as diagnosis or clinical certification.
+Low registration error, visual fit, or successful operator execution does not prove that a maxillomandibular relationship is clinically correct. Scanner acquisition, bite capture, noise, and local registration minima can produce plausible but incorrect results.
 
 ## Decision
 
-Step 2 completion will require explicit user approval.
+Step 2 completion requires explicit user approval.
 
 The following are not sufficient by themselves:
 
-- A Blender operator returning `{'FINISHED'}`.
+- Blender operator success.
 - ICP convergence.
 - Low RMSE.
 - High inlier ratio.
 - Visual plausibility.
-- Successful candidate application.
+- Candidate application.
 
 Before approval, B-Dental must:
 
 - Run required engineering checks.
 - Display blocking errors and non-blocking warnings.
 - Require acknowledgment of warnings when present.
-- Require the user to confirm that the result was visually reviewed.
+- Require confirmation that the result was visually reviewed.
 
-Only `Approve Occlusion` or confirmed Single Arch not-applicable completion may set `step_2_valid = true`.
+Only explicit occlusion approval or confirmed Single Arch not-applicable completion may set `step_2_valid = true`.
 
-Metrics must be described as engineering aids, not clinical validation.
+Metrics are engineering aids and are not clinical validation.
 
 ## Rationale
 
-This approach:
+This avoids false clinical claims, keeps final review responsibility explicit, separates computation from workflow approval, and creates a persistent audit state in the `.blend` file.
 
-- Avoids false clinical claims.
-- Keeps responsibility for final review explicit.
-- Separates computation from workflow approval.
-- Supports warnings without silently ignoring them.
-- Produces a clear audit state in the `.blend` file.
+## Rejected Alternatives
 
-## Alternatives Considered
-
-### Auto-approve Below an RMSE Threshold
-
-Rejected because a low error can still describe an incorrect local registration.
-
-### Treat Candidate Application as Approval
-
-Rejected because application only commits a transform; it does not confirm review.
-
-### Block Every Warning
-
-Rejected because dental scans commonly contain open boundaries and noisy peripheral geometry that may not invalidate registration.
-
-### Provide No Metrics
-
-Rejected because users need objective feedback to diagnose registration quality and failure modes.
+- **Auto-approve below an RMSE threshold:** rejected because low error can still describe a wrong local registration.
+- **Treat candidate application as approval:** rejected because applying a transform does not confirm review.
+- **Block every warning:** rejected because common scan artifacts may be non-blocking.
+- **Provide no metrics:** rejected because users need objective engineering feedback.
 
 ## Consequences
 
-### Positive
-
-- Clear completion semantics.
-- Safer user expectations.
-- Persistent record of method and metrics.
+- Completion semantics are explicit.
 - Warnings remain visible and actionable.
-
-### Limitations
-
 - Approval depends on human review.
-- The extension cannot guarantee clinical correctness.
-- Thresholds require testing and may evolve.
+- The extension does not guarantee clinical correctness.
 
-## Implementation Constraints
+## Implementation Confirmation
 
-- Keep Blender operator status separate from `step_2_valid`.
-- Keep candidate state separate from verified state.
-- Record approval method and summary.
-- Do not label metrics as clinical accuracy.
-- Invalidate approval after material input or transform changes.
-- Preserve warnings with the verified summary where practical.
-
-## Revisit Conditions
-
-Revisit only if the project later operates under a validated clinical quality system with formally established acceptance criteria and traceability.
+The accepted v0.0.3 implementation keeps operator state, candidate state, and verified state separate; requires review confirmation and warning acknowledgment; records method and summary; and invalidates approval after material input or transform changes.
