@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
 
 id = "b_dental"
-version = "0.0.1"
+version = "0.0.2"
 name = "B-Dental"
-tagline = "Foundation interface for the B-Dental Blender extension"
+tagline = "Import and validate dental STL scan sets"
 maintainer = "riku-rio"
 type = "add-on"
 website = "https://github.com/riku-rio/b-dental"
@@ -14,7 +14,15 @@ license = [
   "SPDX:GPL-3.0-or-later",
 ]
 
+[permissions]
+files = "Import intra-oral STL scans selected by the user"
+
 [build]
 paths = [
   "__init__.py",
+  "operators.py",
+  "properties.py",
+  "scene_utils.py",
+  "ui.py",
+  "validation.py",
 ]
