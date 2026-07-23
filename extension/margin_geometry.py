@@ -86,8 +86,9 @@ def ensure_margin_object(scene: bpy.types.Scene, state, restoration) -> bpy.type
 
     obj = restoration_utils.resolve_margin(restoration)
     if obj is None:
+        suffix = restoration.restoration_id[:8]
         curve = bpy.data.curves.new(
-            f"BDENTAL_Margin_{restoration.target_tooth_fdi}_{restoration.restoration_id[:8]}_Curve",
+            f"BDENTAL_Margin_{restoration.target_tooth_fdi}_{suffix}_Curve",
             type="CURVE",
         )
         curve.dimensions = "3D"
@@ -95,7 +96,7 @@ def ensure_margin_object(scene: bpy.types.Scene, state, restoration) -> bpy.type
         curve.bevel_depth = 0.00015
         curve.bevel_resolution = 2
         obj = bpy.data.objects.new(
-            f"BDENTAL_Margin_{restoration.target_tooth_fdi}_{restoration.restoration_id[:8]}",
+            f"BDENTAL_Margin_{restoration.target_tooth_fdi}_{suffix}",
             curve,
         )
         restoration_utils.move_to_restoration_collection(obj, scene)
@@ -202,7 +203,12 @@ def point_surface_distances(
             distance=1000.0,
             depsgraph=depsgraph,
         )
-        distances.append((point - location).length if result else float("inf"))
+        if not result:
+            distances.append(float("inf"))
+            continue
+        point_world = target.matrix_world @ point
+        location_world = target.matrix_world @ location
+        distances.append((point_world - location_world).length)
     return tuple(float(value) for value in distances)
 
 
