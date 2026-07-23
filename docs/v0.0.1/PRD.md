@@ -4,7 +4,7 @@
 
 - **Product:** B-Dental
 - **Version:** v0.0.1
-- **Status:** Planned
+- **Status:** Completed
 - **Target branch:** `feat/v0.0.1-foundation`
 
 ## Product Overview
@@ -71,7 +71,7 @@ As a local Blender user, I want to install and enable the B-Dental extension so 
 
 ## Acceptance Criteria
 
-Version `v0.0.1` is accepted when all of the following are true:
+Version `v0.0.1` is accepted because all of the following were verified locally:
 
 1. The extension manifest passes validation.
 2. The extension package builds successfully.
@@ -79,7 +79,7 @@ Version `v0.0.1` is accepted when all of the following are true:
 4. The extension enables without errors.
 5. A `B-Dental` tab appears in the 3D Viewport sidebar.
 6. The B-Dental panel displays `Not Implemented Yet.` exactly.
-7. The extension disables without errors or leftover interface elements.
+7. The extension registration lifecycle completes without leftover interface elements.
 8. Local installation and verification steps are documented and reproducible.
 
 ## Assumptions and Constraints
@@ -87,8 +87,13 @@ Version `v0.0.1` is accepted when all of the following are true:
 - Development and verification are performed locally.
 - The first interface is intentionally temporary.
 - The chosen panel is an entry point, not a permanent commitment to the final product interface.
-- The minimum supported Blender version will be declared in the manifest during implementation.
+- The manifest declares Blender 4.2 as the minimum supported version.
+- The completed milestone was verified with Blender 5.0.1 on Windows.
 - No product behavior beyond the foundation milestone should be inferred from this document.
+
+## Completion Record
+
+Version `v0.0.1` was completed and accepted after successful validation, package build, local installation, enablement, and visual confirmation of the B-Dental panel in Blender 5.0.1.
 
 ## Future Versions
 

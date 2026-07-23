@@ -13,7 +13,7 @@ The goal of `v0.0.1` is to create the smallest working Blender extension that ca
 - Open or display a dedicated B-Dental screen or panel.
 - Render the placeholder text: `Not Implemented Yet.`
 
-Completing this milestone will confirm that the project can register a local Blender extension, expose its own user interface, and display content successfully.
+Completing this milestone confirms that the project can register a local Blender extension, expose its own user interface, and display content successfully.
 
 ## Scope
 
@@ -43,4 +43,4 @@ The project will be developed through small, testable milestones. Each milestone
 
 ## Project Status
 
-Initial repository setup. Implementation has not started yet.
+Version `v0.0.1` is implemented and locally verified with Blender 5.0.1 on Windows. The extension validates, builds, installs, enables, displays the B-Dental sidebar panel, and renders `Not Implemented Yet.` successfully.

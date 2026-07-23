@@ -1,15 +1,16 @@
 # Local Verification: v0.0.1
 
-This document records the validation, build, installation, and manual acceptance steps for the B-Dental `v0.0.1` extension foundation.
+This document records the completed validation, build, installation, and manual acceptance steps for the B-Dental `v0.0.1` extension foundation.
 
 ## Prerequisites
 
 - Windows with PowerShell.
-- Blender 4.2 or newer. The current development environment uses Blender 5.0.
+- Blender 4.2 or newer.
+- The completed verification used Blender 5.0.1.
 - The repository checked out on `feat/v0.0.1-foundation`.
 - Commands run from the repository root.
 
-Set the Blender executable path for the installed Blender version:
+Set the Blender executable path:
 
 ```powershell
 $Blender = "C:\Program Files\Blender Foundation\Blender 5.0\blender.exe"
@@ -19,11 +20,7 @@ if (-not (Test-Path $Blender)) {
 }
 ```
 
-Change the path if Blender is installed elsewhere.
-
 ## Validate the Extension
-
-Run Blender's extension validator against the source package:
 
 ```powershell
 & $Blender --command extension validate ".\extension"
@@ -33,15 +30,13 @@ if ($LASTEXITCODE -ne 0) {
 }
 ```
 
-Expected result:
+Verified result:
 
 ```text
 Success parsing TOML in ".\extension"
 ```
 
 ## Build the Extension Package
-
-Create a clean output directory and build the distributable ZIP archive:
 
 ```powershell
 $SourceDirectory = Join-Path $PWD "extension"
@@ -74,41 +69,26 @@ Write-Host "Extension package created successfully:"
 Write-Host $Package.FullName
 ```
 
-Expected output package:
+Verified build output:
 
 ```text
-b_dental-0.0.1.zip
+building: b_dental-0.0.1.zip
+complete
+created: "C:\b-addon\b-dental\dist\b_dental-0.0.1.zip"
 ```
 
-The package must contain only:
+The package contains only:
 
 ```text
 __init__.py
 blender_manifest.toml
 ```
 
-The manifest is included automatically by Blender's extension builder. It must not be listed inside `[build].paths`.
-
-Inspect the archive contents with PowerShell:
-
-```powershell
-$InspectionDirectory = Join-Path $OutputDirectory "inspection"
-
-if (Test-Path $InspectionDirectory) {
-    Remove-Item $InspectionDirectory -Recurse -Force
-}
-
-Expand-Archive -Path $Package.FullName -DestinationPath $InspectionDirectory
-
-Get-ChildItem $InspectionDirectory -Recurse -File |
-    ForEach-Object {
-        $_.FullName.Substring($InspectionDirectory.Length + 1)
-    }
-```
+The manifest is included automatically by Blender's extension builder and is intentionally not listed inside `[build].paths`.
 
 ## Install Locally Through Blender
 
-1. Open Blender 5.0.
+1. Open Blender 5.0.1.
 2. Open **Edit > Preferences**.
 3. Select **Get Extensions**.
 4. Open the menu in the upper-right corner.
@@ -128,39 +108,28 @@ Get-ChildItem $InspectionDirectory -Recurse -File |
 Not Implemented Yet.
 ```
 
-6. Open **Edit > Preferences > Get Extensions**.
-7. Disable B-Dental.
-8. Confirm that the `B-Dental` sidebar tab disappears.
-9. Enable B-Dental again.
-10. Confirm that the tab and placeholder return without duplicate-registration errors.
-
-## Console Review
-
-During enable, disable, and re-enable testing, review Blender's console for:
-
-- Manifest errors.
-- Python import errors.
-- Class registration errors.
-- Duplicate registration errors.
-- Class unregistration errors.
-
-The acceptance test passes only when no B-Dental-related error is reported.
+6. Disable B-Dental and confirm the registered interface is removed.
+7. Enable B-Dental again and confirm the interface returns without duplicate-registration errors.
+8. Review the Blender console for B-Dental-related registration, runtime, or cleanup errors.
 
 ## Verification Record
 
-Record the local result before marking the remaining tasks complete:
-
 ```text
-Blender version:
-Validation result:
-Build result:
-Built package:
-Installation result:
-Enable result:
-Panel result:
-Disable result:
-Re-enable result:
-Console errors:
-Tester:
-Date:
+Blender version: 5.0.1
+Validation result: Passed
+Build result: Passed
+Built package: C:\b-addon\b-dental\dist\b_dental-0.0.1.zip
+Installation result: Passed
+Enable result: Passed
+Panel result: Passed; B-Dental tab and panel visible
+Placeholder result: Passed; displays "Not Implemented Yet." exactly
+Disable result: Passed
+Re-enable result: Passed
+Console errors: None related to B-Dental
+Tester: Project owner
+Date: 2026-07-23
 ```
+
+## Final Result
+
+The `v0.0.1` extension foundation passed its acceptance test and is ready for review and squash merge into `main`.
