@@ -1,8 +1,9 @@
-"""Step 3 restoration setup and manual-margin operators for B-Dental."""
+"""Step 3 multiple-restoration and manual-margin operators for B-Dental."""
 
 from __future__ import annotations
 
 import bpy
+from bpy.props import IntProperty
 
 from . import (
     margin_geometry,
@@ -18,19 +19,23 @@ def _state(context):
     return context.scene.bdental_workflow
 
 
-def _messages(state, summary="", errors=(), warnings=()):
-    state.step_3_summary = summary
-    state.step_3_errors = "\n".join(errors)
-    state.step_3_warnings = "\n".join(warnings)
-    state.margin_warning_acknowledged = False
-    state.margin_review_confirmed = False
+def _active(state):
+    return restoration_utils.active_restoration(state)
 
 
-def _store_diagnostics(state, result):
-    state.margin_point_count = result.point_count
-    state.margin_path_length = result.path_length
-    state.margin_mean_surface_distance = result.mean_surface_distance
-    state.margin_max_surface_distance = result.max_surface_distance
+def _messages(restoration, summary="", errors=(), warnings=()):
+    restoration.summary = summary
+    restoration.errors = "\n".join(errors)
+    restoration.warnings = "\n".join(warnings)
+    restoration.warning_acknowledged = False
+    restoration.review_confirmed = False
+
+
+def _store_diagnostics(restoration, result):
+    restoration.margin_point_count = result.point_count
+    restoration.margin_path_length = result.path_length
+    restoration.margin_mean_surface_distance = result.mean_surface_distance
+    restoration.margin_max_surface_distance = result.max_surface_distance
 
 
 def _ready(context):
@@ -100,7 +105,6 @@ def _clear_modal_status(context):
 class BDENTAL_OT_enter_step_three(bpy.types.Operator):
     bl_idname = "bdental.enter_step_three"
     bl_label = "Continue to Step 3"
-    bl_description = "Open restoration setup after Step 2 completion"
     bl_options = {"REGISTER"}
 
     @classmethod
@@ -109,28 +113,28 @@ class BDENTAL_OT_enter_step_three(bpy.types.Operator):
 
     def execute(self, context):
         state = _state(context)
-        restoration_utils.initialize_target_defaults(state)
         result = margin_validation.validate_step_three_preconditions(state)
         if not result.ok:
-            _messages(state, result.summary, result.errors, result.warnings)
+            state.step_3_summary = result.summary
+            state.step_3_errors = "\n".join(result.errors)
             self.report({"ERROR"}, result.errors[0])
             return {"CANCELLED"}
-
+        restoration_utils.migrate_legacy_restoration(state)
+        restoration_utils.initialize_new_restoration_defaults(state)
         state.current_step = "STEP_3"
-        if state.step_3_valid:
-            state.step_3_status = "VERIFIED"
-        elif state.restoration_id and state.target_scan_signature:
-            state.step_3_status = "CANDIDATE" if restoration_utils.resolve_margin(state) else "READY_FOR_MARGIN"
-        else:
-            state.step_3_status = "SETUP_REQUIRED"
-            state.step_3_summary = "Confirm the restoration setup before drawing the margin."
+        properties.sync_step_three_state(state)
+        state.step_3_summary = (
+            f"{len(state.restorations)} restoration(s) configured."
+            if state.restorations
+            else "Add the first restoration."
+        )
         return {"FINISHED"}
 
 
-class BDENTAL_OT_create_restoration(bpy.types.Operator):
-    bl_idname = "bdental.create_restoration"
-    bl_label = "Confirm Restoration Setup"
-    bl_description = "Create one anatomical-crown restoration for the selected arch and FDI tooth"
+class BDENTAL_OT_add_restoration(bpy.types.Operator):
+    bl_idname = "bdental.add_restoration"
+    bl_label = "Add Restoration"
+    bl_description = "Add an independent anatomical crown restoration"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
@@ -140,88 +144,95 @@ class BDENTAL_OT_create_restoration(bpy.types.Operator):
 
     def execute(self, context):
         state = _state(context)
-        if restoration_utils.resolve_margin(state) is not None:
-            self.report({"ERROR"}, "Reset Restoration Setup before changing a restoration with a margin.")
+        restoration_utils.initialize_new_restoration_defaults(state)
+        arch = state.new_target_arch
+        tooth = state.new_target_tooth_fdi
+        if arch not in restoration_utils.available_target_arches(state):
+            self.report({"ERROR"}, "The selected preparation arch is unavailable.")
+            return {"CANCELLED"}
+        if not restoration_utils.tooth_belongs_to_arch(tooth, arch):
+            self.report({"ERROR"}, "The selected FDI tooth does not belong to the preparation arch.")
+            return {"CANCELLED"}
+        if restoration_utils.duplicate_tooth_exists(state, arch, tooth):
+            self.report({"ERROR"}, f"FDI {tooth} already has a restoration.")
             return {"CANCELLED"}
 
-        result = margin_validation.validate_step_three_preconditions(state)
-        if not result.ok:
-            _messages(state, result.summary, result.errors, result.warnings)
-            self.report({"ERROR"}, result.errors[0])
-            return {"CANCELLED"}
-        if not restoration_utils.tooth_belongs_to_arch(state.target_tooth_fdi, state.target_arch):
-            _messages(
-                state,
-                "Restoration setup is invalid.",
-                ("The selected FDI tooth does not belong to the preparation arch.",),
-            )
-            return {"CANCELLED"}
-
-        target = restoration_utils.target_scan(state)
-        state.internal_update_lock = True
-        try:
-            state.restoration_id = state.restoration_id or restoration_utils.new_restoration_id()
-            state.restoration_type = restoration_utils.RESTORATION_TYPE
-            state.target_scan_signature = restoration_utils.target_scan_signature(target)
-            state.step_3_status = "READY_FOR_MARGIN"
-            state.step_3_valid = False
-            state.margin_candidate_closed = False
-            state.margin_review_confirmed = False
-            state.margin_warning_acknowledged = False
-            state.step_3_summary = (
-                f"Anatomical crown configured for FDI {state.target_tooth_fdi} on "
-                f"{properties.role_label(state.target_arch)}."
-            )
-            state.step_3_errors = ""
-            state.step_3_warnings = ""
-        finally:
-            state.internal_update_lock = False
-        self.report({"INFO"}, state.step_3_summary)
+        restoration = state.restorations.add()
+        restoration.restoration_id = restoration_utils.new_restoration_id()
+        restoration.restoration_type = restoration_utils.RESTORATION_TYPE
+        restoration.target_arch = arch
+        restoration.target_tooth_fdi = tooth
+        restoration.target_scan_signature = restoration_utils.target_scan_signature(
+            restoration_utils.target_scan(state, restoration)
+        )
+        restoration.status = "READY_FOR_MARGIN"
+        restoration.summary = f"Anatomical crown configured for FDI {tooth}."
+        state.active_restoration_index = len(state.restorations) - 1
+        properties.sync_step_three_state(state)
+        self.report({"INFO"}, restoration.summary)
         return {"FINISHED"}
 
 
-class BDENTAL_OT_reset_restoration_setup(bpy.types.Operator):
-    bl_idname = "bdental.reset_restoration_setup"
-    bl_label = "Reset Restoration Setup"
-    bl_description = "Remove only the active managed margin and configure the restoration again"
-    bl_options = {"REGISTER", "UNDO"}
+class BDENTAL_OT_select_restoration(bpy.types.Operator):
+    bl_idname = "bdental.select_restoration"
+    bl_label = "Select Restoration"
+    bl_options = {"REGISTER"}
 
-    def invoke(self, context, event):
-        state = _state(context)
-        if state.restoration_id or restoration_utils.resolve_margin(state) is not None:
-            return context.window_manager.invoke_confirm(self, event)
-        return self.execute(context)
+    index: IntProperty(default=0, min=0)
 
     def execute(self, context):
         state = _state(context)
-        restoration_utils.remove_active_margin(state)
-        state.internal_update_lock = True
-        try:
-            properties.clear_step_three_state(state)
-            state.current_step = "STEP_3"
-            restoration_utils.initialize_target_defaults(state)
-            state.step_3_status = "SETUP_REQUIRED"
-            state.step_3_summary = "Restoration setup reset. Select the target arch and tooth."
-        finally:
-            state.internal_update_lock = False
+        active = _active(state)
+        if active is not None and active.margin_session_active:
+            self.report({"ERROR"}, "Apply or cancel the active margin session before switching.")
+            return {"CANCELLED"}
+        if self.index >= len(state.restorations):
+            return {"CANCELLED"}
+        state.active_restoration_index = self.index
+        properties.sync_step_three_state(state)
+        return {"FINISHED"}
+
+
+class BDENTAL_OT_remove_restoration(bpy.types.Operator):
+    bl_idname = "bdental.remove_restoration"
+    bl_label = "Remove Restoration"
+    bl_description = "Remove only the active restoration and its managed margin"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event)
+
+    def execute(self, context):
+        state = _state(context)
+        restoration = _active(state)
+        if restoration is None:
+            return {"CANCELLED"}
+        if restoration.margin_session_active:
+            self.report({"ERROR"}, "Cancel the active margin session before removing this restoration.")
+            return {"CANCELLED"}
+        index = state.active_restoration_index
+        restoration_utils.remove_restoration_margin(restoration)
+        state.restorations.remove(index)
+        state.active_restoration_index = min(index, max(0, len(state.restorations) - 1))
+        properties.sync_step_three_state(state)
         return {"FINISHED"}
 
 
 class BDENTAL_OT_draw_margin(bpy.types.Operator):
     bl_idname = "bdental.draw_margin"
     bl_label = "Draw Manual Margin"
-    bl_description = "Place ordered points on the selected preparation scan"
     bl_options = {"REGISTER", "UNDO", "BLOCKING"}
 
     @classmethod
     def poll(cls, context):
         state = context.scene.bdental_workflow if context.scene else None
+        restoration = _active(state) if state else None
         return bool(
             state
+            and restoration
             and state.current_step == "STEP_3"
             and state.step_2_valid
-            and state.restoration_id
-            and not state.margin_session_active
+            and not restoration.margin_session_active
         )
 
     def invoke(self, context, event):
@@ -229,22 +240,21 @@ class BDENTAL_OT_draw_margin(bpy.types.Operator):
         if context.area is None or context.area.type != "VIEW_3D" or context.region_data is None:
             self.report({"ERROR"}, "Manual margin drawing must start in a 3D Viewport.")
             return {"CANCELLED"}
-
         state = _state(context)
-        result = margin_validation.validate_restoration_setup(state)
+        restoration = _active(state)
+        result = margin_validation.validate_restoration_setup(state, restoration)
         if not result.ok:
-            _messages(state, result.summary, result.errors, result.warnings)
+            _messages(restoration, result.summary, result.errors, result.warnings)
             self.report({"ERROR"}, result.errors[0])
             return {"CANCELLED"}
-
         try:
-            margin = step_three_session.start_session(context.scene, state)
+            margin = step_three_session.start_session(context.scene, state, restoration)
             _select_only(context, margin)
         except Exception as exc:
-            state.step_3_status = "ERROR"
-            _messages(state, "Could not start the manual margin session.", (str(exc),))
+            restoration.status = "ERROR"
+            _messages(restoration, "Could not start the manual margin session.", (str(exc),))
+            properties.sync_step_three_state(state)
             return {"CANCELLED"}
-
         context.window_manager.modal_handler_add(self)
         instructions = "LMB: add point | Backspace/Ctrl+Z: remove last | Enter/RMB: close | Esc: cancel"
         try:
@@ -256,50 +266,44 @@ class BDENTAL_OT_draw_margin(bpy.types.Operator):
 
     def modal(self, context, event):
         state = _state(context)
-        margin = restoration_utils.resolve_margin(state)
-        target = restoration_utils.target_scan(state)
-        if margin is None or target is None:
+        restoration = _active(state)
+        margin = restoration_utils.resolve_margin(restoration)
+        target = restoration_utils.target_scan(state, restoration)
+        if restoration is None or margin is None or target is None:
             _clear_modal_status(context)
-            if state.margin_session_active:
-                step_three_session.cancel_session(state)
-            self.report({"ERROR"}, "The active margin or preparation scan became unavailable.")
+            if restoration is not None and restoration.margin_session_active:
+                step_three_session.cancel_session(state, restoration)
+            self.report({"ERROR"}, "The active restoration became unavailable.")
             return {"CANCELLED"}
 
         if event.type == "ESC" and event.value == "PRESS":
-            step_three_session.cancel_session(state)
+            step_three_session.cancel_session(state, restoration)
             _clear_modal_status(context)
-            self.report({"INFO"}, "Manual margin drawing cancelled.")
             return {"CANCELLED"}
-
         if event.type in {"BACK_SPACE", "DEL"} and event.value == "PRESS":
             margin_geometry.remove_last_curve_point(margin)
-            state.margin_candidate_closed = False
+            restoration.margin_candidate_closed = False
             return {"RUNNING_MODAL"}
-
         if event.type == "Z" and event.value == "PRESS" and event.ctrl:
             margin_geometry.remove_last_curve_point(margin)
-            state.margin_candidate_closed = False
+            restoration.margin_candidate_closed = False
             return {"RUNNING_MODAL"}
-
         if event.type == "LEFTMOUSE" and event.value == "PRESS":
             hit = margin_geometry.raycast_target(context, event, target)
             if hit is None:
-                self.report({"WARNING"}, "No point was added; click directly on the preparation scan.")
+                self.report({"WARNING"}, "Click directly on the active preparation scan.")
             else:
                 margin_geometry.append_curve_point(margin, hit)
-                state.margin_point_count = len(margin_geometry.curve_points(margin))
-                state.step_3_summary = f"Placed {state.margin_point_count} margin point(s)."
+                restoration.margin_point_count = len(margin_geometry.curve_points(margin))
+                restoration.summary = f"Placed {restoration.margin_point_count} margin point(s)."
             return {"RUNNING_MODAL"}
-
         if event.type in {"RET", "NUMPAD_ENTER", "RIGHTMOUSE"} and event.value == "PRESS":
-            ok, message = step_three_session.capture_candidate(state)
+            ok, message = step_three_session.capture_candidate(state, restoration)
             if not ok:
                 self.report({"WARNING"}, message)
                 return {"RUNNING_MODAL"}
             _clear_modal_status(context)
-            self.report({"INFO"}, message)
             return {"FINISHED"}
-
         if event.type in {
             "MIDDLEMOUSE",
             "WHEELUPMOUSE",
@@ -318,11 +322,12 @@ class BDENTAL_OT_reset_margin_session(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        state = context.scene.bdental_workflow if context.scene else None
-        return bool(state and state.margin_session_active)
+        restoration = _active(context.scene.bdental_workflow) if context.scene else None
+        return bool(restoration and restoration.margin_session_active)
 
     def execute(self, context):
-        step_three_session.reset_session(_state(context))
+        state = _state(context)
+        step_three_session.reset_session(state, _active(state))
         return {"FINISHED"}
 
 
@@ -333,8 +338,8 @@ class BDENTAL_OT_cancel_margin_session(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        state = context.scene.bdental_workflow if context.scene else None
-        return bool(state and state.margin_session_active)
+        restoration = _active(context.scene.bdental_workflow) if context.scene else None
+        return bool(restoration and restoration.margin_session_active)
 
     def execute(self, context):
         if context.object is not None and context.object.mode == "EDIT":
@@ -342,7 +347,8 @@ class BDENTAL_OT_cancel_margin_session(bpy.types.Operator):
                 bpy.ops.object.mode_set(mode="OBJECT")
             except RuntimeError:
                 pass
-        step_three_session.cancel_session(_state(context))
+        state = _state(context)
+        step_three_session.cancel_session(state, _active(state))
         return {"FINISHED"}
 
 
@@ -353,12 +359,12 @@ class BDENTAL_OT_apply_margin_candidate(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        state = context.scene.bdental_workflow if context.scene else None
+        restoration = _active(context.scene.bdental_workflow) if context.scene else None
         return bool(
-            state
-            and state.margin_session_active
-            and state.margin_candidate_closed
-            and restoration_utils.resolve_margin(state) is not None
+            restoration
+            and restoration.margin_session_active
+            and restoration.margin_candidate_closed
+            and restoration_utils.resolve_margin(restoration) is not None
         )
 
     def execute(self, context):
@@ -368,62 +374,66 @@ class BDENTAL_OT_apply_margin_candidate(bpy.types.Operator):
             except RuntimeError:
                 pass
         state = _state(context)
-        ok, message = step_three_session.capture_candidate(state)
+        restoration = _active(state)
+        ok, message = step_three_session.capture_candidate(state, restoration)
         if not ok:
             self.report({"ERROR"}, message)
             return {"CANCELLED"}
-        step_three_session.apply_candidate(state)
+        step_three_session.apply_candidate(state, restoration)
         return {"FINISHED"}
 
 
 class BDENTAL_OT_prepare_margin_edit(bpy.types.Operator):
     bl_idname = "bdental.prepare_margin_edit"
     bl_label = "Edit Margin Points"
-    bl_description = "Start a reversible edit session for the managed margin curve"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
     def poll(cls, context):
-        state = context.scene.bdental_workflow if context.scene else None
+        restoration = _active(context.scene.bdental_workflow) if context.scene else None
         return bool(
-            state
-            and not state.margin_session_active
-            and restoration_utils.resolve_margin(state) is not None
+            restoration
+            and not restoration.margin_session_active
+            and restoration_utils.resolve_margin(restoration) is not None
         )
 
     def execute(self, context):
         state = _state(context)
-        margin = step_three_session.start_session(context.scene, state)
-        points = margin_geometry.curve_points(margin)
-        margin_geometry.replace_curve_points(margin, points, cyclic=True)
-        state.margin_candidate_closed = True
+        restoration = _active(state)
+        margin = step_three_session.start_session(context.scene, state, restoration)
+        margin_geometry.replace_curve_points(
+            margin,
+            margin_geometry.curve_points(margin),
+            cyclic=True,
+        )
+        restoration.margin_candidate_closed = True
         _select_only(context, margin)
         try:
             bpy.ops.object.mode_set(mode="EDIT")
             bpy.ops.curve.select_all(action="SELECT")
         except RuntimeError as exc:
-            step_three_session.cancel_session(state)
-            self.report({"ERROR"}, f"Could not enter curve edit mode: {exc}")
+            step_three_session.cancel_session(state, restoration)
+            self.report({"ERROR"}, str(exc))
             return {"CANCELLED"}
-        state.step_3_summary = "Edit the selected curve points, then reproject and capture the candidate."
+        restoration.summary = "Edit points, then reproject and capture the candidate."
         return {"FINISHED"}
 
 
 class BDENTAL_OT_reproject_margin(bpy.types.Operator):
     bl_idname = "bdental.reproject_margin"
     bl_label = "Reproject Margin Points"
-    bl_description = "Project edited margin points to the nearest target-scan surface locations"
     bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
     def poll(cls, context):
-        state = context.scene.bdental_workflow if context.scene else None
-        return bool(state and restoration_utils.resolve_margin(state) is not None)
+        restoration = _active(context.scene.bdental_workflow) if context.scene else None
+        return bool(restoration and restoration_utils.resolve_margin(restoration) is not None)
 
     def execute(self, context):
         state = _state(context)
-        margin = restoration_utils.resolve_margin(state)
-        target = restoration_utils.target_scan(state)
+        restoration = _active(state)
+        margin = restoration_utils.resolve_margin(restoration)
+        target = restoration_utils.target_scan(state, restoration)
         if margin is None or target is None:
             return {"CANCELLED"}
         if context.object is not None and context.object.mode == "EDIT":
@@ -432,21 +442,21 @@ class BDENTAL_OT_reproject_margin(bpy.types.Operator):
             except RuntimeError as exc:
                 self.report({"ERROR"}, str(exc))
                 return {"CANCELLED"}
-        points = margin_geometry.curve_points(margin)
         try:
             projected = margin_geometry.reproject_points(
                 target,
-                points,
+                margin_geometry.curve_points(margin),
                 context.evaluated_depsgraph_get(),
             )
             margin_geometry.replace_curve_points(margin, projected, cyclic=True)
         except (RuntimeError, ValueError) as exc:
             self.report({"ERROR"}, str(exc))
             return {"CANCELLED"}
-        state.margin_candidate_closed = True
-        state.step_3_valid = False
-        state.step_3_status = "CANDIDATE" if not state.margin_session_active else "DRAWING"
-        state.step_3_summary = "Margin points reprojected to the target preparation surface."
+        properties.clear_restoration_approval(restoration)
+        restoration.margin_candidate_closed = True
+        restoration.status = "DRAWING" if restoration.margin_session_active else "CANDIDATE"
+        restoration.summary = "Margin points reprojected to this restoration's preparation surface."
+        properties.sync_step_three_state(state)
         return {"FINISHED"}
 
 
@@ -454,11 +464,6 @@ class BDENTAL_OT_capture_edited_margin(bpy.types.Operator):
     bl_idname = "bdental.capture_edited_margin"
     bl_label = "Capture Edited Candidate"
     bl_options = {"REGISTER", "UNDO"}
-
-    @classmethod
-    def poll(cls, context):
-        state = context.scene.bdental_workflow if context.scene else None
-        return bool(state and state.margin_session_active)
 
     def execute(self, context):
         if context.object is not None and context.object.mode == "EDIT":
@@ -468,11 +473,11 @@ class BDENTAL_OT_capture_edited_margin(bpy.types.Operator):
                 self.report({"ERROR"}, str(exc))
                 return {"CANCELLED"}
         state = _state(context)
-        ok, message = step_three_session.capture_candidate(state)
+        restoration = _active(state)
+        ok, message = step_three_session.capture_candidate(state, restoration)
         if not ok:
             self.report({"ERROR"}, message)
             return {"CANCELLED"}
-        self.report({"INFO"}, message)
         return {"FINISHED"}
 
 
@@ -481,24 +486,20 @@ class BDENTAL_OT_validate_margin(bpy.types.Operator):
     bl_label = "Run Margin Validation"
     bl_options = {"REGISTER"}
 
-    @classmethod
-    def poll(cls, context):
-        state = context.scene.bdental_workflow if context.scene else None
-        return bool(
-            state
-            and not state.margin_session_active
-            and restoration_utils.resolve_margin(state) is not None
-        )
-
     def execute(self, context):
         state = _state(context)
-        result = margin_validation.validate_margin(state, context.evaluated_depsgraph_get())
-        state.step_3_status = result.status
-        state.step_3_valid = False
-        _store_diagnostics(state, result)
-        _messages(state, result.summary, result.errors, result.warnings)
+        restoration = _active(state)
+        result = margin_validation.validate_margin(
+            state,
+            restoration,
+            context.evaluated_depsgraph_get(),
+        )
+        restoration.status = result.status
+        restoration.valid = False
+        _store_diagnostics(restoration, result)
+        _messages(restoration, result.summary, result.errors, result.warnings)
+        properties.sync_step_three_state(state)
         if result.ok:
-            self.report({"INFO"}, result.summary)
             return {"FINISHED"}
         self.report({"ERROR"}, result.errors[0])
         return {"CANCELLED"}
@@ -507,46 +508,51 @@ class BDENTAL_OT_validate_margin(bpy.types.Operator):
 class BDENTAL_OT_approve_margin(bpy.types.Operator):
     bl_idname = "bdental.approve_margin"
     bl_label = "Approve Manual Margin"
-    bl_description = "Approve the reviewed margin without claiming clinical correctness"
     bl_options = {"REGISTER"}
 
     @classmethod
     def poll(cls, context):
-        state = context.scene.bdental_workflow if context.scene else None
+        restoration = _active(context.scene.bdental_workflow) if context.scene else None
         return bool(
-            state
-            and state.step_3_status == "CANDIDATE"
-            and not state.margin_session_active
-            and state.margin_review_confirmed
-            and not state.step_3_errors
-            and (not state.step_3_warnings or state.margin_warning_acknowledged)
+            restoration
+            and restoration.status == "CANDIDATE"
+            and not restoration.margin_session_active
+            and restoration.review_confirmed
+            and not restoration.errors
+            and (not restoration.warnings or restoration.warning_acknowledged)
         )
 
     def execute(self, context):
         state = _state(context)
-        result = margin_validation.validate_margin(state, context.evaluated_depsgraph_get())
-        _store_diagnostics(state, result)
+        restoration = _active(state)
+        result = margin_validation.validate_margin(
+            state,
+            restoration,
+            context.evaluated_depsgraph_get(),
+        )
+        _store_diagnostics(restoration, result)
         if not result.ok:
-            _messages(state, result.summary, result.errors, result.warnings)
+            _messages(restoration, result.summary, result.errors, result.warnings)
+            properties.sync_step_three_state(state)
             return {"CANCELLED"}
-        if result.warnings and not state.margin_warning_acknowledged:
-            _messages(state, result.summary, result.errors, result.warnings)
-            self.report({"ERROR"}, "Acknowledge the margin warnings before approval.")
+        if result.warnings and not restoration.warning_acknowledged:
+            _messages(restoration, result.summary, result.errors, result.warnings)
+            self.report({"ERROR"}, "Acknowledge warnings before approval.")
             return {"CANCELLED"}
-        if not state.margin_review_confirmed:
+        if not restoration.review_confirmed:
             self.report({"ERROR"}, "Confirm visual review before approval.")
             return {"CANCELLED"}
 
-        step_three_session.snapshot_approved(state)
-        state.step_3_status = "VERIFIED"
-        state.step_3_valid = True
-        state.step_3_errors = ""
-        state.step_3_warnings = "\n".join(result.warnings)
-        state.step_3_summary = (
-            f"Step 3 approved for anatomical crown FDI {state.target_tooth_fdi}. "
+        step_three_session.snapshot_approved(state, restoration)
+        restoration.status = "VERIFIED"
+        restoration.valid = True
+        restoration.errors = ""
+        restoration.warnings = "\n".join(result.warnings)
+        restoration.summary = (
+            f"Manual margin approved for FDI {restoration.target_tooth_fdi}. "
             "Engineering checks do not certify clinical correctness."
         )
-        self.report({"INFO"}, "Step 3 manual margin approved.")
+        properties.sync_step_three_state(state)
         return {"FINISHED"}
 
 
@@ -555,12 +561,12 @@ class BDENTAL_OT_focus_step_three_target(bpy.types.Operator):
     bl_label = "Focus Preparation Scan"
 
     def execute(self, context):
-        target = restoration_utils.target_scan(_state(context))
+        state = _state(context)
+        target = restoration_utils.target_scan(state, _active(state))
         if target is None:
             return {"CANCELLED"}
         _select_only(context, target)
-        if not _frame_selected(context):
-            self.report({"WARNING"}, "Preparation scan selected, but no 3D Viewport could be framed.")
+        _frame_selected(context)
         return {"FINISHED"}
 
 
@@ -569,12 +575,11 @@ class BDENTAL_OT_focus_margin(bpy.types.Operator):
     bl_label = "Focus Margin"
 
     def execute(self, context):
-        margin = restoration_utils.resolve_margin(_state(context))
+        margin = restoration_utils.resolve_margin(_active(_state(context)))
         if margin is None:
             return {"CANCELLED"}
         _select_only(context, margin)
-        if not _frame_selected(context):
-            self.report({"WARNING"}, "Margin selected, but no 3D Viewport could be framed.")
+        _frame_selected(context)
         return {"FINISHED"}
 
 
@@ -584,7 +589,7 @@ class BDENTAL_OT_toggle_margin_visibility(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        margin = restoration_utils.resolve_margin(_state(context))
+        margin = restoration_utils.resolve_margin(_active(_state(context)))
         if margin is None:
             return {"CANCELLED"}
         margin.hide_viewport = not margin.hide_viewport
@@ -597,27 +602,30 @@ class BDENTAL_OT_back_to_step_two(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def invoke(self, context, event):
-        if _state(context).margin_session_active:
+        restoration = _active(_state(context))
+        if restoration is not None and restoration.margin_session_active:
             return context.window_manager.invoke_confirm(self, event)
         return self.execute(context)
 
     def execute(self, context):
         state = _state(context)
+        restoration = _active(state)
         if context.object is not None and context.object.mode == "EDIT":
             try:
                 bpy.ops.object.mode_set(mode="OBJECT")
             except RuntimeError:
                 pass
-        if state.margin_session_active:
-            step_three_session.cancel_session(state)
+        if restoration is not None and restoration.margin_session_active:
+            step_three_session.cancel_session(state, restoration)
         state.current_step = "STEP_2"
         return {"FINISHED"}
 
 
 CLASSES = (
     BDENTAL_OT_enter_step_three,
-    BDENTAL_OT_create_restoration,
-    BDENTAL_OT_reset_restoration_setup,
+    BDENTAL_OT_add_restoration,
+    BDENTAL_OT_select_restoration,
+    BDENTAL_OT_remove_restoration,
     BDENTAL_OT_draw_margin,
     BDENTAL_OT_reset_margin_session,
     BDENTAL_OT_cancel_margin_session,
