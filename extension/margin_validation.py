@@ -136,17 +136,25 @@ def validate_margin(state, restoration, depsgraph) -> MarginValidationResult:
     if any(not margin_geometry.finite_point(point) for point in points):
         errors.append("The margin contains non-finite coordinates.")
 
-    lengths = margin_geometry.segment_lengths(points)
+    world_points = tuple(target.matrix_world @ point for point in points) if target else ()
+    lengths = margin_geometry.segment_lengths(world_points)
     if any(value <= margin_geometry.POINT_EPSILON for value in lengths):
         errors.append("Consecutive margin points collapse within the engineering tolerance.")
 
-    length = margin_geometry.path_length(points)
+    length = margin_geometry.path_length(world_points)
     if length < margin_geometry.MIN_PATH_LENGTH:
         errors.append("The margin path is too short for a usable closed candidate.")
 
     distances: tuple[float, ...] = ()
     if not errors and target is not None:
-        distances = margin_geometry.point_surface_distances(target, points, depsgraph)
+        local_distances = margin_geometry.point_surface_distances(target, points, depsgraph)
+        scale_matrix = target.matrix_world.to_3x3()
+        distances = tuple(
+            (scale_matrix @ ((point.normalized() if point.length else point) * distance)).length
+            if math.isfinite(distance)
+            else float("inf")
+            for point, distance in zip(points, local_distances)
+        )
         if any(not math.isfinite(value) for value in distances):
             errors.append("At least one margin point could not be resolved against the target surface.")
         elif distances and max(distances) > margin_geometry.SURFACE_BLOCKING_DISTANCE:
@@ -156,10 +164,10 @@ def validate_margin(state, restoration, depsgraph) -> MarginValidationResult:
         warnings.append("The margin contains fewer than twelve points; inspect curve detail carefully.")
     if distances and max(distances) > margin_geometry.SURFACE_WARNING_DISTANCE:
         warnings.append("At least one margin point is more than 0.25 mm from the target surface.")
-    if points and margin_geometry.spacing_ratio(points) > 10.0:
+    if world_points and margin_geometry.spacing_ratio(world_points) > 10.0:
         warnings.append("Margin point spacing varies substantially; inspect sparse regions.")
 
-    proximity = margin_geometry.approximate_non_adjacent_proximity(points)
+    proximity = margin_geometry.approximate_non_adjacent_proximity(world_points)
     if proximity is not None and proximity < margin_geometry.SELF_PROXIMITY_DISTANCE:
         warnings.append("Non-adjacent margin segments are very close and may cross or fold.")
 
