@@ -3,80 +3,43 @@
 ## Metadata
 
 - **Version:** v0.0.3
-- **Status:** Proposed
+- **Status:** Accepted
 - **Related requirements:** [`../PRD.md`](../PRD.md)
 - **Related plan:** [`../plans/0001-occlusion-registration-verification.md`](../plans/0001-occlusion-registration-verification.md)
 
 ## Context
 
-Upper and lower STL files may already share a scanner-generated coordinate system. In many cases they appear nearly articulated immediately after import. That relationship may be useful, but visual plausibility alone does not prove that the occlusion is correct.
+Upper and lower STL files may already share a scanner-generated coordinate system. The relationship may be useful, but visual plausibility does not prove that the occlusion is correct.
 
-Automatically moving every imported case would damage cases that are already positioned well. Automatically approving every imported case would create false confidence.
+Automatically moving every imported case could degrade a good scanner-exported relationship. Automatically approving the imported relationship would create false confidence.
 
 ## Decision
 
-Entering Step 2 will not modify any object transform.
-
-The imported upper-to-lower relationship will begin as an unverified candidate. The user must run analysis explicitly.
-
-Analysis may classify the relationship as:
-
-- `IMPORTED_CANDIDATE`
-- `NEEDS_ALIGNMENT`
-- `ERROR`
-
-Analysis alone may never set `step_2_valid = true`.
-
-A plausible imported candidate may proceed directly to verification and explicit approval without automatic realignment.
+- Entering Step 2 does not modify object transforms.
+- The imported relationship begins as an unverified candidate.
+- Analysis is initiated explicitly by the user.
+- Analysis may classify the relationship as `IMPORTED_CANDIDATE`, `NEEDS_ALIGNMENT`, or `ERROR`.
+- Analysis alone never sets `step_2_valid = true`.
+- A plausible imported candidate may proceed to verification and explicit approval without automatic realignment.
 
 ## Rationale
 
-This approach:
+This approach preserves scanner-exported relationships, avoids unnecessary transforms, separates plausibility from approval, supports cases with or without bite scans, and keeps user intent explicit.
 
-- Preserves scanner-exported relationships.
-- Avoids unnecessary transforms.
-- Separates plausibility from verification.
-- Supports cases with and without bite scans.
-- Keeps user intent explicit.
-- Avoids claiming clinical certainty from appearance alone.
+## Rejected Alternatives
 
-## Alternatives Considered
-
-### Automatically Accept Imported Alignment
-
-Rejected because scanner exports and bite registrations can contain errors.
-
-### Automatically Re-register Every Case
-
-Rejected because local registration can degrade an already correct relationship and may converge to an incorrect local minimum.
-
-### Require Bite Scans for Every Dual-Arch Case
-
-Rejected because some valid scanner exports preserve articulation while some workflows do not provide bite STL files.
+- **Automatically accept imported alignment:** rejected because imported relationships can be wrong.
+- **Automatically re-register every case:** rejected because local registration can degrade a good relationship.
+- **Require bite scans for every dual-arch case:** rejected because useful imported articulation may exist without bite STL files.
 
 ## Consequences
-
-### Positive
 
 - Step 2 is non-destructive on entry.
 - Good imported relationships can be retained.
 - Poor relationships can be corrected.
-- Approval remains explicit.
+- The user must still inspect and approve the result.
+- Metrics remain engineering aids rather than clinical proof.
 
-### Limitations
+## Implementation Confirmation
 
-- Imported analysis cannot prove clinical correctness.
-- The user must still inspect the result.
-- Some cases require manual or bite-guided correction.
-
-## Implementation Constraints
-
-- No transforms during Step 2 entry.
-- No automatic approval.
-- Analysis results must be structured and persistent.
-- Metrics must be labeled as engineering aids.
-- Approval requires a separate action.
-
-## Revisit Conditions
-
-Revisit this decision only if a future version introduces validated scanner metadata, trusted registration provenance, or a clinically governed approval workflow.
+The accepted v0.0.3 implementation follows this decision. Imported analysis preserves matrices, produces candidate or needs-alignment states, and keeps approval as a separate explicit action.
