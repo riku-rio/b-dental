@@ -20,6 +20,65 @@ SURFACE_BLOCKING_DISTANCE = 0.001
 MIN_PATH_LENGTH = 0.002
 SELF_PROXIMITY_DISTANCE = 0.0002
 
+MARGIN_DISPLAY_RADIUS = 0.0002
+MARGIN_DISPLAY_BEVEL_RESOLUTION = 3
+MARGIN_DISPLAY_MATERIAL_NAME = "BDENTAL_Margin_Display"
+MARGIN_DISPLAY_COLOR = (0.0, 0.8, 1.0, 1.0)
+
+
+def _ensure_margin_display_material() -> bpy.types.Material:
+    material = bpy.data.materials.get(MARGIN_DISPLAY_MATERIAL_NAME)
+    if material is None:
+        material = bpy.data.materials.new(MARGIN_DISPLAY_MATERIAL_NAME)
+
+    material.diffuse_color = MARGIN_DISPLAY_COLOR
+    material.use_nodes = True
+
+    if material.node_tree is not None:
+        principled = material.node_tree.nodes.get("Principled BSDF")
+        if principled is not None:
+            base_color = principled.inputs.get("Base Color")
+            if base_color is not None:
+                base_color.default_value = MARGIN_DISPLAY_COLOR
+
+            roughness = principled.inputs.get("Roughness")
+            if roughness is not None:
+                roughness.default_value = 0.3
+
+            emission_color = principled.inputs.get("Emission Color")
+            if emission_color is None:
+                emission_color = principled.inputs.get("Emission")
+            if emission_color is not None:
+                emission_color.default_value = MARGIN_DISPLAY_COLOR
+
+            emission_strength = principled.inputs.get("Emission Strength")
+            if emission_strength is not None:
+                emission_strength.default_value = 0.35
+
+    return material
+
+
+def _configure_margin_display(obj: bpy.types.Object) -> None:
+    if obj.type != "CURVE" or obj.data is None:
+        raise ValueError("Margin object must be a Curve.")
+
+    curve = obj.data
+    curve.dimensions = "3D"
+    curve.resolution_u = 1
+    curve.bevel_depth = MARGIN_DISPLAY_RADIUS
+    curve.bevel_resolution = MARGIN_DISPLAY_BEVEL_RESOLUTION
+    curve.fill_mode = "FULL"
+    curve.use_fill_caps = True
+
+    material = _ensure_margin_display_material()
+    curve.materials.clear()
+    curve.materials.append(material)
+
+    obj.color = MARGIN_DISPLAY_COLOR
+    obj.display_type = "SOLID"
+    obj.show_in_front = True
+    obj.hide_render = True
+
 
 def serialize_points(points: Iterable[Vector | Sequence[float]]) -> str:
     payload = [[float(value) for value in point[:3]] for point in points]
@@ -64,11 +123,8 @@ def replace_curve_points(
     *,
     cyclic: bool,
 ) -> None:
-    if obj.type != "CURVE" or obj.data is None:
-        raise ValueError("Margin object must be a Curve.")
+    _configure_margin_display(obj)
     values = tuple(Vector(point[:3]) for point in points)
-    obj.data.dimensions = "3D"
-    obj.data.resolution_u = 1
     obj.data.splines.clear()
     if not values:
         return
@@ -91,10 +147,6 @@ def ensure_margin_object(scene: bpy.types.Scene, state, restoration) -> bpy.type
             f"BDENTAL_Margin_{restoration.target_tooth_fdi}_{suffix}_Curve",
             type="CURVE",
         )
-        curve.dimensions = "3D"
-        curve.resolution_u = 1
-        curve.bevel_depth = 0.00015
-        curve.bevel_resolution = 2
         obj = bpy.data.objects.new(
             f"BDENTAL_Margin_{restoration.target_tooth_fdi}_{suffix}",
             curve,
@@ -102,6 +154,7 @@ def ensure_margin_object(scene: bpy.types.Scene, state, restoration) -> bpy.type
         restoration_utils.move_to_restoration_collection(obj, scene)
         restoration.margin_object = obj
 
+    _configure_margin_display(obj)
     obj.parent = target
     obj.matrix_parent_inverse = Matrix.Identity(4)
     obj.matrix_basis = Matrix.Identity(4)
