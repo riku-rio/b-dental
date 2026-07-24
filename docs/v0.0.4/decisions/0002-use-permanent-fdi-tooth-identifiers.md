@@ -3,7 +3,7 @@
 ## Metadata
 
 - **Version:** v0.0.4
-- **Status:** Proposed
+- **Status:** Accepted
 - **Related requirements:** [`../PRD.md`](../PRD.md)
 - **Related plan:** [`../plans/0001-restoration-setup-manual-margin-definition.md`](../plans/0001-restoration-setup-manual-margin-definition.md)
 
@@ -19,7 +19,7 @@ The restoration requires a durable tooth identity. Human-readable labels alone a
 - Lower arch values are `31` through `38` and `41` through `48`.
 - The UI filters tooth options by the selected target arch.
 - Invalid arch-to-tooth combinations are rejected even if introduced through stale or scripted state.
-- The canonical FDI identifier is stored in workflow state and margin metadata.
+- The canonical FDI identifier is stored in workflow state and managed artifact metadata.
 
 ## Rationale
 
@@ -27,19 +27,16 @@ FDI identifiers are concise, deterministic, serializable, and naturally encode a
 
 ## Rejected Alternatives
 
-- **Store only a free-text tooth label:** rejected because it is not reliably validated or comparable.
-- **Use Blender object names as tooth identity:** rejected because names are editable and scene-specific.
-- **Support FDI, Universal, and Palmer simultaneously:** rejected because notation conversion is outside the first margin milestone.
-- **Infer the tooth from click location:** rejected because automatic tooth identification is outside scope and can be wrong.
-- **Include primary dentition now:** rejected to keep the first restoration model narrowly testable.
+- Store only a free-text tooth label.
+- Use Blender object names as tooth identity.
+- Support FDI, Universal, and Palmer simultaneously.
+- Infer the tooth number from click location.
+- Include primary dentition in v0.0.4.
 
 ## Consequences
 
-- Users working in another notation system must select the equivalent FDI tooth.
-- Arch filtering is a required UI and validation behavior.
-- Future notation preferences may display alternative labels while preserving FDI as the stored canonical identifier.
-- Primary dentition requires a future explicit scope and migration decision.
+Users working in another notation system must select the equivalent FDI tooth. The MVP trusts the user to choose the correct FDI tooth; automatic tooth-number verification remains outside scope.
 
 ## Acceptance Confirmation
 
-This decision becomes accepted when the v0.0.4 documentation set is approved. The implementation must store the canonical identifier independently of translated or formatted UI labels.
+Accepted after successful v0.0.4 implementation and local verification.
