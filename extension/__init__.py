@@ -5,6 +5,7 @@ from bpy.app.handlers import persistent
 from bpy.props import PointerProperty
 
 from . import (
+    antagonist_region,
     margin_geometry,
     margin_overlay,
     margin_validation,
@@ -24,6 +25,7 @@ CLASSES = (
     + operators.CLASSES
     + step_two_operators.CLASSES
     + step_three_operators.CLASSES
+    + antagonist_region.CLASSES
     + ui.CLASSES
 )
 
