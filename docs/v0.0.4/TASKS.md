@@ -1,5 +1,13 @@
 # Tasks: v0.0.4
 
+## Status
+
+- **Version:** v0.0.4
+- **Release status:** Complete
+- **Workflow:** Step 3 — Multiple Restorations, Manual Margins & Antagonist Regions
+- **Verification:** Passed locally
+- **Merge strategy:** Squash and merge
+
 ## Documentation Revision
 
 - [x] V004-001 Supersede the single-restoration decision.
@@ -8,7 +16,7 @@
 - [x] V004-004 Revise the implementation plan.
 - [x] V004-005 Revise the task checklist.
 - [x] V004-006 Revise the verification matrix.
-- [ ] V004-007 Accept documentation after implementation verification.
+- [x] V004-007 Accept documentation after implementation verification.
 
 ## Collection State
 
@@ -33,8 +41,8 @@
 - [x] V004-023 Implement one-time legacy restoration migration.
 - [x] V004-024 Preserve legacy margin pointer during migration.
 - [x] V004-025 Preserve legacy diagnostics and approval snapshots.
-- [ ] V004-026 Verify v0.0.3 migration in Blender.
-- [ ] V004-027 Verify single-restoration v0.0.4 migration in Blender.
+- [x] V004-026 Verify v0.0.3 migration in Blender.
+- [x] V004-027 Verify single-restoration v0.0.4 migration in Blender.
 
 ## Restoration Ownership
 
@@ -122,19 +130,32 @@
 
 ## Packaging and Regression Verification
 
-- [ ] V004-091 Validate the extension manifest.
-- [ ] V004-092 Build `b_dental-0.0.4.zip`.
-- [ ] V004-093 Inspect package contents.
-- [ ] V004-094 Install and enable the package.
-- [ ] V004-095 Verify repeated enable, disable, and reload.
-- [ ] V004-096 Re-run Step 1 regression scenarios.
-- [ ] V004-097 Re-run Step 2 regression scenarios.
-- [ ] V004-098 Execute the complete revised Step 3 scenario matrix.
-- [ ] V004-099 Record actual implementation results and deviations.
-- [ ] V004-100 Update README after acceptance.
-- [ ] V004-101 Mark PRD and plan completed only after verification.
-- [ ] V004-102 Prepare a non-draft PR for squash merge.
+- [x] V004-091 Validate the extension manifest.
+- [x] V004-092 Build `b_dental-0.0.4.zip`.
+- [x] V004-093 Inspect package contents.
+- [x] V004-094 Install and enable the package.
+- [x] V004-095 Verify repeated enable, disable, and reload.
+- [x] V004-096 Re-run Step 1 regression scenarios.
+- [x] V004-097 Re-run Step 2 regression scenarios.
+- [x] V004-098 Execute the complete revised Step 3 scenario matrix.
+- [x] V004-099 Record actual implementation results and deviations.
+- [x] V004-100 Update README after acceptance.
+- [x] V004-101 Mark PRD and plan completed after verification.
+- [x] V004-102 Prepare a non-draft PR for squash merge.
 
-## Current Status
+## Antagonist Region MVP
 
-The multiple-restoration code and documentation revision are implemented. Blender package validation and local manual verification remain pending.
+- [x] V004-103 Resolve the opposing arch per restoration.
+- [x] V004-104 Add automatic antagonist-region detection from the approved margin location.
+- [x] V004-105 Add manual antagonist-region picking on the opposing scan.
+- [x] V004-106 Store per-restoration region ownership, source, radius, and scan signatures.
+- [x] V004-107 Display, focus, hide, resize, and clear the managed region.
+- [x] V004-108 Require antagonist-region review when an opposing arch exists.
+- [x] V004-109 Treat antagonist regions as not applicable for single-arch cases.
+- [x] V004-110 Invalidate approval after region or opposing-scan changes.
+- [x] V004-111 Remove only the owning region during restoration deletion or case reset.
+- [x] V004-112 Verify automatic, manual, persistence, invalidation, and cleanup behavior locally.
+
+## Completion Record
+
+All v0.0.4 tasks are complete. The implementation and documentation were accepted after local Blender validation, package verification, installation, lifecycle testing, migration checks, regression testing, and the complete Step 3 verification matrix. The release pull request is ready for review and **Squash and merge**.
