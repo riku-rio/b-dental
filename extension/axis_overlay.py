@@ -36,10 +36,11 @@ def _world_samples(state, restoration):
 def _draw_points(vertices, color) -> None:
     if not vertices:
         return
-    shader = gpu.shader.from_builtin("UNIFORM_COLOR")
+    shader = gpu.shader.from_builtin("POINT_UNIFORM_COLOR")
     batch = batch_for_shader(shader, "POINTS", {"pos": vertices})
     shader.bind()
     shader.uniform_float("color", color)
+    shader.uniform_float("size", _POINT_SIZE)
     batch.draw(shader)
 
 
@@ -82,13 +83,11 @@ def _draw_overlay() -> None:
     try:
         gpu.state.blend_set("ALPHA")
         gpu.state.depth_test_set("LESS_EQUAL")
-        gpu.state.point_size_set(_POINT_SIZE)
         _draw_axis(state, restoration, viewport_size)
         if restoration.analysis_overlay_visible and restoration.analysis_current:
             _draw_points(clear_points, _CLEAR_COLOR)
             _draw_points(undercut_points, _UNDERCUT_COLOR)
     finally:
-        gpu.state.point_size_set(1.0)
         gpu.state.depth_test_set("LESS_EQUAL")
         gpu.state.blend_set("NONE")
 
