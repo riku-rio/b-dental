@@ -8,17 +8,28 @@ from . import (
     antagonist_region,
     axis_geometry,
     axis_overlay,
+    crown_bottom_candidates,
+    crown_bottom_geometry,
+    crown_bottom_overlay,
+    crown_bottom_scoring,
     margin_geometry,
     margin_overlay,
     margin_validation,
     operators,
     preparation_analysis,
+    preparation_die,
+    preparation_region,
     properties,
+    relief_field,
     restoration_utils,
     scene_utils,
+    seal_band,
     step_four_operators,
     step_four_session,
     step_four_validation,
+    step_five_operators,
+    step_five_session,
+    step_five_validation,
     step_three_operators,
     step_three_session,
     step_two_operators,
@@ -32,6 +43,7 @@ CLASSES = (
     + step_two_operators.CLASSES
     + step_three_operators.CLASSES
     + step_four_operators.CLASSES
+    + step_five_operators.CLASSES
     + antagonist_region.CLASSES
     + ui.CLASSES
 )
@@ -45,8 +57,6 @@ if not hasattr(scene_utils, "_bdental_original_has_destructive_reset_content"):
 
 
 def _reset_workflow_state_with_dependencies(state) -> None:
-    """Reset Step 1 and explicitly clear all dependent workflow state."""
-
     scene_utils._bdental_original_reset_workflow_state(state)
     state.internal_update_lock = True
     try:
@@ -57,20 +67,32 @@ def _reset_workflow_state_with_dependencies(state) -> None:
         state.step_4_summary = ""
         state.step_4_errors = ""
         state.step_4_warnings = ""
+        state.step_5_status = "NOT_STARTED"
+        state.step_5_valid = False
+        state.step_5_summary = ""
+        state.step_5_errors = ""
+        state.step_5_warnings = ""
     finally:
         state.internal_update_lock = False
 
 
 def _remove_managed_case_content(scene, state) -> int:
     removed_scans = scene_utils._bdental_original_remove_managed_case_scans(scene, state)
+    step_five_objects = {
+        obj.as_pointer(): obj for obj in crown_bottom_candidates.iter_managed_artifacts(scene)
+    }
     restoration_utils.remove_all_managed_restoration_artifacts(scene, state)
-    return removed_scans
+    removed_step_five = sum(
+        1 for obj in step_five_objects.values() if crown_bottom_candidates.remove_artifact(obj)
+    )
+    return removed_scans + removed_step_five
 
 
 def _has_destructive_case_content(scene, state) -> bool:
     return bool(
         scene_utils._bdental_original_has_destructive_reset_content(scene, state)
         or restoration_utils.has_managed_restoration_artifacts(scene, state)
+        or any(True for _obj in crown_bottom_candidates.iter_managed_artifacts(scene))
     )
 
 
@@ -103,19 +125,15 @@ def _monitor_axis_artifacts(state) -> None:
 def _monitor_workflow_dependencies(scene, _depsgraph) -> None:
     step_three_session.monitor_scene(scene)
     step_four_session.monitor_scene(scene)
+    step_five_session.monitor_scene(scene)
     if hasattr(scene, "bdental_workflow"):
         _monitor_axis_artifacts(scene.bdental_workflow)
 
 
 def register() -> None:
-    """Register B-Dental classes and scene-persistent workflow state."""
-
     for cls in CLASSES:
         bpy.utils.register_class(cls)
-
-    bpy.types.Scene.bdental_workflow = PointerProperty(
-        type=properties.BDENTAL_PG_WorkflowState
-    )
+    bpy.types.Scene.bdental_workflow = PointerProperty(type=properties.BDENTAL_PG_WorkflowState)
     if _monitor_workflow_dependencies not in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.append(_monitor_workflow_dependencies)
     margin_overlay.register()
@@ -123,14 +141,11 @@ def register() -> None:
 
 
 def unregister() -> None:
-    """Remove scene state and unregister B-Dental classes in reverse order."""
-
     axis_overlay.unregister()
     margin_overlay.unregister()
     if _monitor_workflow_dependencies in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.remove(_monitor_workflow_dependencies)
     if hasattr(bpy.types.Scene, "bdental_workflow"):
         del bpy.types.Scene.bdental_workflow
-
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)
