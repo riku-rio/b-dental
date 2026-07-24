@@ -7,12 +7,19 @@ from dataclasses import dataclass
 
 from mathutils import Vector
 
-from .crown_bottom_geometry import MeshGeometry, polygon_signed_area, projected_coordinates, resample_closed_polyline
+from .crown_bottom_geometry import (
+    MeshGeometry,
+    normalized,
+    polygon_signed_area,
+    projected_coordinates,
+    resample_closed_polyline,
+)
 from .preparation_die import BlockoutResult
 from .relief_field import ReliefResult
 
-SEAL_POLICY_VERSION = 1
+SEAL_POLICY_VERSION = 2
 MINIMUM_SEAL_WIDTH_FACTOR = 0.35
+ALIGNMENT_CANDIDATE_LIMIT = 16
 
 
 @dataclass(frozen=True)
@@ -27,12 +34,27 @@ class SealBandResult:
     maximum_width: float
 
 
-def _loop_area(vertices: tuple[Vector, ...], loop: tuple[int, ...], basis) -> float:
-    points = tuple(projected_coordinates(vertices[index], basis)[:2] for index in loop)
+def _loop_area(
+    vertices: tuple[Vector, ...],
+    loop: tuple[int, ...],
+    basis,
+) -> float:
+    points = tuple(
+        projected_coordinates(vertices[index], basis)[:2]
+        for index in loop
+    )
     return polygon_signed_area(points)
 
 
-def _match_margin_orientation(
+def _rotate_samples(
+    samples: tuple[Vector, ...],
+    offset: int,
+) -> tuple[Vector, ...]:
+    count = len(samples)
+    return tuple(samples[(index + offset) % count] for index in range(count))
+
+
+def _match_margin_correspondence(
     margin: tuple[Vector, ...],
     boundary_vertices: tuple[Vector, ...],
     boundary_loop: tuple[int, ...],
@@ -40,10 +62,78 @@ def _match_margin_orientation(
 ) -> tuple[Vector, ...]:
     samples = resample_closed_polyline(margin, len(boundary_loop))
     boundary_area = _loop_area(boundary_vertices, boundary_loop, basis)
-    margin_area = polygon_signed_area(tuple(projected_coordinates(point, basis)[:2] for point in samples))
+    margin_area = polygon_signed_area(
+        tuple(
+            projected_coordinates(point, basis)[:2]
+            for point in samples
+        )
+    )
     if boundary_area * margin_area < 0.0:
-        return tuple(reversed(samples))
-    return samples
+        samples = tuple(reversed(samples))
+
+    boundary_points = tuple(
+        boundary_vertices[index] for index in boundary_loop
+    )
+    nearest_offsets = sorted(
+        range(len(samples)),
+        key=lambda offset: (
+            boundary_points[0] - samples[offset]
+        ).length_squared,
+    )[: min(ALIGNMENT_CANDIDATE_LIMIT, len(samples))]
+
+    def alignment_cost(offset: int) -> float:
+        return sum(
+            (
+                boundary_points[index]
+                - samples[(index + offset) % len(samples)]
+            ).length_squared
+            for index in range(len(samples))
+        )
+
+    best_offset = min(nearest_offsets, key=alignment_cost)
+    return _rotate_samples(samples, best_offset)
+
+
+def _inward_directions(
+    vertices: tuple[Vector, ...],
+    boundary: tuple[int, ...],
+    basis,
+) -> tuple[Vector, ...]:
+    first, second, _axis = basis
+    points_2d = tuple(
+        projected_coordinates(vertices[index], basis)[:2]
+        for index in boundary
+    )
+    signed_area = polygon_signed_area(points_2d)
+    if abs(signed_area) <= 1.0e-15:
+        raise ValueError(
+            "The preparation boundary collapses in the insertion-axis projection."
+        )
+    orientation = 1.0 if signed_area > 0.0 else -1.0
+
+    directions: list[Vector] = []
+    count = len(boundary)
+    for index in range(count):
+        previous = points_2d[(index - 1) % count]
+        following = points_2d[(index + 1) % count]
+        tangent_x = following[0] - previous[0]
+        tangent_y = following[1] - previous[1]
+        tangent_length = math.hypot(tangent_x, tangent_y)
+        if tangent_length <= 1.0e-15:
+            raise ValueError(
+                "The preparation boundary contains a collapsed local tangent."
+            )
+        tangent_x /= tangent_length
+        tangent_y /= tangent_length
+        inward_x = -tangent_y * orientation
+        inward_y = tangent_x * orientation
+        direction = normalized(first * inward_x + second * inward_y)
+        if direction is None:
+            raise ValueError(
+                "The seal-band inward direction is undefined at the preparation boundary."
+            )
+        directions.append(direction)
+    return tuple(directions)
 
 
 def build_seal_band(
@@ -56,35 +146,39 @@ def build_seal_band(
     patch = blockout.patch
     boundary = patch.geometry.boundary_loop
     if len(boundary) < 3:
-        raise ValueError("The preparation patch has no ordered boundary for seal-band construction.")
+        raise ValueError(
+            "The preparation patch has no ordered boundary for seal-band construction."
+        )
     if not math.isfinite(marginal_gap) or marginal_gap < 0.0:
-        raise ValueError("Marginal gap must be finite and non-negative.")
+        raise ValueError(
+            "Marginal gap must be finite and non-negative."
+        )
     if not math.isfinite(seal_band_width) or seal_band_width <= 0.0:
-        raise ValueError("Seal-band width must be finite and positive.")
+        raise ValueError(
+            "Seal-band width must be finite and positive."
+        )
 
-    vertices = [point.copy() for point in relief.vertices]
-    center = sum(patch.margin_world, Vector()) / len(patch.margin_world)
-    axis = patch.axis_world
-
-    inner_positions: list[Vector] = []
-    for vertex_index in boundary:
-        point = vertices[vertex_index]
-        radial = center - point
-        radial -= axis * radial.dot(axis)
-        radial_length = radial.length
-        if radial_length <= 1.0e-12:
-            raise ValueError("The seal-band inward direction is undefined at the preparation boundary.")
-        move_distance = min(seal_band_width, radial_length * 0.35)
-        inner = point + radial.normalized() * move_distance
-        vertices[vertex_index] = inner
-        inner_positions.append(inner)
-
-    margin_samples = _match_margin_orientation(
+    source_vertices = tuple(point.copy() for point in relief.vertices)
+    margin_samples = _match_margin_correspondence(
         patch.margin_world,
-        tuple(vertices),
+        source_vertices,
         boundary,
         patch.basis,
     )
+    inward_directions = _inward_directions(
+        source_vertices,
+        boundary,
+        patch.basis,
+    )
+
+    vertices = [point.copy() for point in source_vertices]
+    inner_positions: list[Vector] = []
+    for vertex_index, direction in zip(boundary, inward_directions):
+        point = source_vertices[vertex_index]
+        inner = point + direction * seal_band_width
+        vertices[vertex_index] = inner
+        inner_positions.append(inner)
+
     outer_indices: list[int] = []
     widths: list[float] = []
     for offset, margin_point in enumerate(margin_samples):
@@ -108,7 +202,8 @@ def build_seal_band(
     continuity = (
         len(outer_indices) == len(boundary)
         and len(set(outer_indices)) == len(outer_indices)
-        and minimum_width >= seal_band_width * MINIMUM_SEAL_WIDTH_FACTOR
+        and minimum_width
+        >= seal_band_width * MINIMUM_SEAL_WIDTH_FACTOR
     )
     geometry = MeshGeometry(
         vertices=tuple(vertices),
@@ -118,7 +213,10 @@ def build_seal_band(
         metadata=(
             ("seal_policy", str(SEAL_POLICY_VERSION)),
             ("inner_loop", ",".join(str(index) for index in boundary)),
-            ("outer_loop", ",".join(str(index) for index in outer_indices)),
+            (
+                "outer_loop",
+                ",".join(str(index) for index in outer_indices),
+            ),
         ),
     )
     return SealBandResult(
