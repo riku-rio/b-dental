@@ -10,13 +10,17 @@ from typing import Sequence
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
-from .crown_bottom_geometry import MeshGeometry, resample_closed_polyline, topology_metrics
+from .crown_bottom_geometry import (
+    MeshGeometry,
+    resample_closed_polyline,
+    topology_metrics,
+)
 from .preparation_die import BlockoutResult
 from .preparation_region import PreparationPatch
 from .relief_field import ReliefResult
 from .seal_band import SealBandResult
 
-SCORING_POLICY_VERSION = 1
+SCORING_POLICY_VERSION = 2
 MAX_MARGIN_DEVIATION = 0.00035
 MAX_RESIDUAL_BLOCKING_DEPTH = 0.00003
 MAX_SELF_INTERSECTIONS = 0
@@ -80,19 +84,25 @@ def deserialize_metrics(value: str) -> CandidateMetrics | None:
         return None
     try:
         payload = json.loads(value)
-        payload["rejection_reasons"] = tuple(str(item) for item in payload.get("rejection_reasons", ()))
+        payload["rejection_reasons"] = tuple(
+            str(item) for item in payload.get("rejection_reasons", ())
+        )
         return CandidateMetrics(**payload)
     except (TypeError, ValueError, KeyError, json.JSONDecodeError):
         return None
 
 
-def _triangulate_faces(faces: Sequence[Sequence[int]]) -> tuple[tuple[int, int, int], ...]:
+def _triangulate_faces(
+    faces: Sequence[Sequence[int]],
+) -> tuple[tuple[int, int, int], ...]:
     triangles: list[tuple[int, int, int]] = []
     for face in faces:
         if len(face) < 3:
             continue
         for index in range(1, len(face) - 1):
-            triangles.append((int(face[0]), int(face[index]), int(face[index + 1])))
+            triangles.append(
+                (int(face[0]), int(face[index]), int(face[index + 1]))
+            )
     return tuple(triangles)
 
 
@@ -100,7 +110,12 @@ def _self_intersection_count(geometry: MeshGeometry) -> int:
     triangles = _triangulate_faces(geometry.faces)
     if not triangles:
         return 0
-    tree = BVHTree.FromPolygons(geometry.vertices, triangles, all_triangles=True, epsilon=1.0e-9)
+    tree = BVHTree.FromPolygons(
+        geometry.vertices,
+        triangles,
+        all_triangles=True,
+        epsilon=1.0e-9,
+    )
     overlaps = tree.overlap(tree)
     count = 0
     for left_index, right_index in overlaps:
@@ -116,10 +131,15 @@ def _self_intersection_count(geometry: MeshGeometry) -> int:
     return count
 
 
-def _face_normal(vertices: tuple[Vector, ...], face: Sequence[int]) -> Vector | None:
+def _face_normal(
+    vertices: tuple[Vector, ...],
+    face: Sequence[int],
+) -> Vector | None:
     if len(face) < 3:
         return None
-    normal = (vertices[face[1]] - vertices[face[0]]).cross(vertices[face[2]] - vertices[face[0]])
+    normal = (vertices[face[1]] - vertices[face[0]]).cross(
+        vertices[face[2]] - vertices[face[0]]
+    )
     if normal.length <= 1.0e-14:
         return None
     normal.normalize()
@@ -128,7 +148,9 @@ def _face_normal(vertices: tuple[Vector, ...], face: Sequence[int]) -> Vector | 
 
 def _smoothness_error(geometry: MeshGeometry) -> float:
     edge_faces: dict[tuple[int, int], list[int]] = {}
-    normals = [_face_normal(geometry.vertices, face) for face in geometry.faces]
+    normals = [
+        _face_normal(geometry.vertices, face) for face in geometry.faces
+    ]
     for face_index, face in enumerate(geometry.faces):
         for left, right in zip(face, (*face[1:], face[0])):
             edge = (left, right) if left < right else (right, left)
@@ -153,17 +175,42 @@ def _margin_deviations(
 ) -> tuple[float, float, float]:
     if not outer_loop:
         return float("inf"), float("inf"), 0.0
-    margin_samples = resample_closed_polyline(margin_world, len(outer_loop))
+    margin_samples = resample_closed_polyline(
+        margin_world,
+        len(outer_loop),
+    )
     distances = [
         (geometry.vertices[vertex_index] - margin_samples[index]).length
         for index, vertex_index in enumerate(outer_loop)
     ]
-    coverage = sum(1 for distance in distances if math.isfinite(distance)) / len(distances)
+    coverage = (
+        sum(1 for distance in distances if math.isfinite(distance))
+        / len(distances)
+    )
     return (
         float(sum(distances) / len(distances)),
         float(max(distances, default=0.0)),
         float(coverage),
     )
+
+
+def _generated_minimum_feature_size(
+    geometry: MeshGeometry,
+    seal: SealBandResult,
+) -> float:
+    """Measure only Step 5-created seal geometry, not source STL tessellation."""
+
+    lengths: list[float] = []
+    for loop in (seal.outer_loop, seal.inner_loop):
+        for left, right in zip(loop, (*loop[1:], loop[0])):
+            lengths.append(
+                (geometry.vertices[right] - geometry.vertices[left]).length
+            )
+    for outer, inner in zip(seal.outer_loop, seal.inner_loop):
+        lengths.append(
+            (geometry.vertices[outer] - geometry.vertices[inner]).length
+        )
+    return float(min(lengths, default=0.0))
 
 
 def _normalized_good(value: float, limit: float) -> float:
@@ -185,34 +232,67 @@ def evaluate_candidate(
 ) -> ScoredCandidate:
     geometry = seal.geometry
     topology = topology_metrics(geometry)
-    mean_margin, max_margin, coverage = _margin_deviations(geometry, patch.margin_world, seal.outer_loop)
+    mean_margin, max_margin, coverage = _margin_deviations(
+        geometry,
+        patch.margin_world,
+        seal.outer_loop,
+    )
     self_intersections = _self_intersection_count(geometry)
     smoothness = _smoothness_error(geometry)
+    generated_minimum_feature = _generated_minimum_feature_size(
+        geometry,
+        seal,
+    )
     reasons: list[str] = []
 
     if coverage < 1.0:
         reasons.append("Margin correspondence is incomplete.")
     if max_margin > MAX_MARGIN_DEVIATION:
         reasons.append(
-            f"Maximum margin deviation is {max_margin * 1000.0:.3f} mm, above the supported tolerance."
+            f"Maximum margin deviation is {max_margin * 1000.0:.3f} mm, "
+            "above the supported tolerance."
         )
     if not seal.continuity:
-        reasons.append("The margin seal band is not continuous at the configured width.")
-    if blockout.residual_collision_count > 0 or blockout.maximum_residual_depth > MAX_RESIDUAL_BLOCKING_DEPTH:
         reasons.append(
-            f"Insertion-path validation found {blockout.residual_collision_count} residual obstruction sample(s)."
+            "The margin seal band is not continuous at the configured width."
+        )
+    if (
+        blockout.residual_collision_count > 0
+        or blockout.maximum_residual_depth > MAX_RESIDUAL_BLOCKING_DEPTH
+    ):
+        reasons.append(
+            f"Insertion-path validation found "
+            f"{blockout.residual_collision_count} residual obstruction "
+            "sample(s)."
         )
     if self_intersections > MAX_SELF_INTERSECTIONS:
-        reasons.append(f"The candidate contains {self_intersections} non-adjacent self-intersection pair(s).")
-    if topology.boundary_loop_count != 1:
-        reasons.append(f"The crown bottom must have one margin boundary loop; found {topology.boundary_loop_count}.")
-    if topology.non_manifold_edge_count:
-        reasons.append(f"The candidate contains {topology.non_manifold_edge_count} non-manifold edge(s).")
-    if topology.degenerate_face_count:
-        reasons.append(f"The candidate contains {topology.degenerate_face_count} degenerate face(s).")
-    if topology.minimum_edge_length and topology.minimum_edge_length < MIN_LOCAL_FEATURE_SIZE:
         reasons.append(
-            f"Minimum local feature size is {topology.minimum_edge_length * 1000.0:.3f} mm, below the supported limit."
+            f"The candidate contains {self_intersections} non-adjacent "
+            "self-intersection pair(s)."
+        )
+    if topology.boundary_loop_count != 1:
+        reasons.append(
+            f"The crown bottom must have one margin boundary loop; found "
+            f"{topology.boundary_loop_count}."
+        )
+    if topology.non_manifold_edge_count:
+        reasons.append(
+            f"The candidate contains {topology.non_manifold_edge_count} "
+            "non-manifold edge(s)."
+        )
+    if topology.degenerate_face_count:
+        reasons.append(
+            f"The candidate contains {topology.degenerate_face_count} "
+            "degenerate face(s)."
+        )
+    if (
+        generated_minimum_feature
+        and generated_minimum_feature < MIN_LOCAL_FEATURE_SIZE
+    ):
+        reasons.append(
+            f"Minimum generated local feature size is "
+            f"{generated_minimum_feature * 1000.0:.3f} mm, below the "
+            "supported limit."
         )
 
     relief_target_error = 0.0
@@ -221,10 +301,18 @@ def evaluate_candidate(
     path_term = 1.0 if not blockout.residual_collision_count else 0.0
     relief_term = _normalized_good(relief_target_error, 0.00005)
     smoothness_term = _normalized_good(smoothness, 0.5)
-    topology_term = 1.0 if not topology.non_manifold_edge_count and topology.boundary_loop_count == 1 else 0.0
+    topology_term = (
+        1.0
+        if not topology.non_manifold_edge_count
+        and topology.boundary_loop_count == 1
+        else 0.0
+    )
     self_term = 1.0 if not self_intersections else 0.0
     complexity_penalty = min(0.1, topology.face_count / 1_000_000.0)
-    runtime_penalty = min(0.1, max(0.0, generation_duration) / 300.0)
+    runtime_penalty = min(
+        0.1,
+        max(0.0, generation_duration) / 300.0,
+    )
     score = 100.0 * (
         0.20 * margin_term
         + 0.18 * seal_term
@@ -264,7 +352,7 @@ def evaluate_candidate(
         boundary_loop_count=topology.boundary_loop_count,
         non_manifold_edge_count=topology.non_manifold_edge_count,
         degenerate_face_count=topology.degenerate_face_count,
-        minimum_local_feature_size=topology.minimum_edge_length,
+        minimum_local_feature_size=generated_minimum_feature,
         optimization_iterations=blockout.iterations + relief.iterations,
         generation_duration=max(0.0, generation_duration),
         smoothness_error=smoothness,
@@ -281,7 +369,14 @@ def evaluate_candidate(
     )
 
 
-def rank_candidates(candidates: Sequence[ScoredCandidate]) -> tuple[ScoredCandidate, ...]:
+def rank_candidates(
+    candidates: Sequence[ScoredCandidate],
+) -> tuple[ScoredCandidate, ...]:
     accepted = [candidate for candidate in candidates if candidate.accepted]
-    accepted.sort(key=lambda candidate: (-round(candidate.score, 9), candidate.candidate_id))
+    accepted.sort(
+        key=lambda candidate: (
+            -round(candidate.score, 9),
+            candidate.candidate_id,
+        )
+    )
     return tuple(accepted)
