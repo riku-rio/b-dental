@@ -30,6 +30,7 @@ from . import (
     step_five_operators,
     step_five_session,
     step_five_validation,
+    step_five_navigation,
     step_three_operators,
     step_three_session,
     step_two_operators,
@@ -44,6 +45,7 @@ CLASSES = (
     + step_three_operators.CLASSES
     + step_four_operators.CLASSES
     + step_five_operators.CLASSES
+    + step_five_navigation.CLASSES
     + antagonist_region.CLASSES
     + ui.CLASSES
 )
