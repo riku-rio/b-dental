@@ -22,6 +22,7 @@ paths = [
   "__init__.py",
   "alignment.py",
   "margin_geometry.py",
+  "margin_overlay.py",
   "margin_validation.py",
   "occlusion_validation.py",
   "operators.py",
