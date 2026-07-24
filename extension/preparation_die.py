@@ -11,7 +11,7 @@ from mathutils import Vector
 from .crown_bottom_geometry import MeshGeometry, projected_coordinates
 from .preparation_region import PreparationPatch, vertex_normals
 
-DIE_POLICY_VERSION = 1
+DIE_POLICY_VERSION = 2
 DEFAULT_BASE_EXTENSION = 0.0025
 MIN_BASE_EXTENSION = 0.001
 MAX_BASE_EXTENSION = 0.006
@@ -30,7 +30,9 @@ class BlockoutResult:
     iterations: int
 
 
-def _patch_edges(faces: tuple[tuple[int, ...], ...]) -> tuple[tuple[int, int], ...]:
+def _patch_edges(
+    faces: tuple[tuple[int, ...], ...],
+) -> tuple[tuple[int, int], ...]:
     edges = set()
     for face in faces:
         for left, right in zip(face, (*face[1:], face[0])):
@@ -38,7 +40,10 @@ def _patch_edges(faces: tuple[tuple[int, ...], ...]) -> tuple[tuple[int, int], .
     return tuple(sorted(edges))
 
 
-def _vertex_neighbors(vertex_count: int, faces: tuple[tuple[int, ...], ...]) -> tuple[tuple[int, ...], ...]:
+def _vertex_neighbors(
+    vertex_count: int,
+    faces: tuple[tuple[int, ...], ...],
+) -> tuple[tuple[int, ...], ...]:
     neighbors = [set() for _ in range(vertex_count)]
     for left, right in _patch_edges(faces):
         neighbors[left].add(right)
@@ -46,12 +51,20 @@ def _vertex_neighbors(vertex_count: int, faces: tuple[tuple[int, ...], ...]) -> 
     return tuple(tuple(sorted(items)) for items in neighbors)
 
 
-def _grid_key(point: Vector, basis, cell_size: float) -> tuple[int, int]:
+def _grid_key(
+    point: Vector,
+    basis,
+    cell_size: float,
+) -> tuple[int, int]:
     first, second, _axis = projected_coordinates(point, basis)
     return math.floor(first / cell_size), math.floor(second / cell_size)
 
 
-def _accessible_heights(vertices: tuple[Vector, ...], basis, cell_size: float) -> tuple[float, ...]:
+def _accessible_heights(
+    vertices: tuple[Vector, ...],
+    basis,
+    cell_size: float,
+) -> tuple[float, ...]:
     cells: dict[tuple[int, int], list[int]] = defaultdict(list)
     coordinates = [projected_coordinates(vertex, basis) for vertex in vertices]
     for index, vertex in enumerate(vertices):
@@ -63,7 +76,9 @@ def _accessible_heights(vertices: tuple[Vector, ...], basis, cell_size: float) -
         nearby: list[int] = []
         for horizontal in (-1, 0, 1):
             for vertical in (-1, 0, 1):
-                nearby.extend(cells.get((key[0] + horizontal, key[1] + vertical), ()))
+                nearby.extend(
+                    cells.get((key[0] + horizontal, key[1] + vertical), ())
+                )
         if not nearby:
             accessible.append(coordinates[index][2])
             continue
@@ -72,9 +87,15 @@ def _accessible_heights(vertices: tuple[Vector, ...], basis, cell_size: float) -
         heights = [
             coordinates[item][2]
             for item in nearby
-            if (coordinates[item][0] - u_value) ** 2 + (coordinates[item][1] - v_value) ** 2 <= radius_squared
+            if (
+                (coordinates[item][0] - u_value) ** 2
+                + (coordinates[item][1] - v_value) ** 2
+                <= radius_squared
+            )
         ]
-        accessible.append(min(heights) if heights else coordinates[index][2])
+        accessible.append(
+            min(heights) if heights else coordinates[index][2]
+        )
     return tuple(float(value) for value in accessible)
 
 
@@ -87,7 +108,9 @@ def build_blockout(
     maximum_iterations: int,
 ) -> BlockoutResult:
     if not math.isfinite(clearance) or clearance < 0.0:
-        raise ValueError("Blockout clearance must be finite and non-negative.")
+        raise ValueError(
+            "Blockout clearance must be finite and non-negative."
+        )
     cell_size = max(0.00005, float(resolution))
     iterations = max(1, min(int(maximum_iterations), 20))
     smoothing = max(0.0, min(1.0, float(smoothing_strength)))
@@ -97,14 +120,18 @@ def build_blockout(
     basis = patch.basis
     boundary = set(patch.geometry.boundary_loop)
     neighbors = _vertex_neighbors(len(source), patch.geometry.faces)
-    source_heights = tuple(projected_coordinates(vertex, basis)[2] for vertex in source)
+    source_heights = tuple(
+        projected_coordinates(vertex, basis)[2] for vertex in source
+    )
     accessible = _accessible_heights(source, basis, cell_size)
-    target_heights = [
+
+    envelope_heights = tuple(
         source_heights[index]
         if index in boundary
         else min(source_heights[index], accessible[index] - clearance)
         for index in range(len(source))
-    ]
+    )
+    target_heights = list(envelope_heights)
 
     for _iteration in range(iterations):
         if smoothing <= 0.0:
@@ -113,25 +140,41 @@ def build_blockout(
         for index, adjacent in enumerate(neighbors):
             if index in boundary or not adjacent:
                 continue
-            average = sum(target_heights[item] for item in adjacent) / len(adjacent)
-            proposed = target_heights[index] * (1.0 - smoothing * 0.25) + average * (smoothing * 0.25)
-            updated[index] = min(source_heights[index], accessible[index] - clearance, proposed)
+            average = sum(target_heights[item] for item in adjacent) / len(
+                adjacent
+            )
+            proposed = (
+                target_heights[index] * (1.0 - smoothing * 0.25)
+                + average * (smoothing * 0.25)
+            )
+            updated[index] = min(envelope_heights[index], proposed)
         target_heights = updated
 
     blocked = tuple(
-        source[index] + axis * (target_heights[index] - source_heights[index])
+        source[index]
+        + axis * (target_heights[index] - source_heights[index])
         for index in range(len(source))
     )
-    depths = [max(0.0, source_heights[index] - target_heights[index]) for index in range(len(source))]
+    blocked_heights = tuple(
+        projected_coordinates(vertex, basis)[2] for vertex in blocked
+    )
+    depths = [
+        max(0.0, source_heights[index] - blocked_heights[index])
+        for index in range(len(source))
+    ]
     moved = [value for value in depths if value > 1.0e-9]
 
-    final_accessible = _accessible_heights(blocked, basis, cell_size)
     residual_depths = [
-        max(0.0, projected_coordinates(blocked[index], basis)[2] - final_accessible[index])
+        max(0.0, blocked_heights[index] - envelope_heights[index])
         for index in range(len(blocked))
         if index not in boundary
     ]
-    residual = [value for value in residual_depths if value > RESIDUAL_OBSTRUCTION_TOLERANCE]
+    residual = [
+        value
+        for value in residual_depths
+        if value > RESIDUAL_OBSTRUCTION_TOLERANCE
+    ]
+
     return BlockoutResult(
         patch=patch,
         blocked_vertices=blocked,
@@ -144,7 +187,9 @@ def build_blockout(
     )
 
 
-def _oriented_faces(faces: tuple[tuple[int, ...], ...]) -> tuple[tuple[int, ...], ...]:
+def _oriented_faces(
+    faces: tuple[tuple[int, ...], ...],
+) -> tuple[tuple[int, ...], ...]:
     return tuple(tuple(face) for face in faces)
 
 
@@ -158,8 +203,13 @@ def build_closed_die(
     faces = list(_oriented_faces(patch.geometry.faces))
     boundary = patch.geometry.boundary_loop
     if len(boundary) < 3:
-        raise ValueError("The preparation patch has no usable boundary loop.")
-    extension = max(MIN_BASE_EXTENSION, min(MAX_BASE_EXTENSION, float(base_extension)))
+        raise ValueError(
+            "The preparation patch has no usable boundary loop."
+        )
+    extension = max(
+        MIN_BASE_EXTENSION,
+        min(MAX_BASE_EXTENSION, float(base_extension)),
+    )
     axis = patch.axis_world
     heights = [vertex.dot(axis) for vertex in vertices]
     base_height = max(heights) + extension
@@ -196,6 +246,8 @@ def build_closed_die(
     )
 
 
-def blocked_patch_normals(blockout: BlockoutResult) -> tuple[Vector, ...]:
+def blocked_patch_normals(
+    blockout: BlockoutResult,
+) -> tuple[Vector, ...]:
     normals = vertex_normals(blockout.patch)
     return tuple(normal.copy() for normal in normals)
