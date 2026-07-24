@@ -5,6 +5,7 @@ from __future__ import annotations
 import bpy
 import gpu
 from gpu_extras.batch import batch_for_shader
+from mathutils import Vector
 
 from . import axis_geometry, preparation_analysis, restoration_utils
 
@@ -24,7 +25,7 @@ def _world_samples(state, restoration):
     clear_points = []
     undercut_points = []
     for sample in preparation_analysis.deserialize_samples(restoration.analysis_samples):
-        point = target.matrix_world @ sample.location
+        point = target.matrix_world @ Vector(sample.location)
         if sample.blocked:
             undercut_points.append(tuple(point))
         else:
