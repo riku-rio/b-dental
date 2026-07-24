@@ -41,6 +41,7 @@ paths = [
   "restoration_utils.py",
   "scene_utils.py",
   "seal_band.py",
+  "step_five_navigation.py",
   "step_five_operators.py",
   "step_five_session.py",
   "step_five_validation.py",
