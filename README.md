@@ -4,6 +4,14 @@ B-Dental is a custom Blender Extension for building a structured digital dental 
 
 The project is developed through small, verifiable releases. Each release defines requirements, architectural decisions, an implementation plan, a task checklist, and a local verification record before the next workflow stage begins.
 
+## Product Vision: Automation First
+
+B-Dental is intended to replace routine manual restoration design with an automated Blender-native workflow based on computational geometry, procedural construction, collision analysis, constraint solving, and bounded optimization.
+
+For normal supported cases, the user should primarily confirm inputs, review generated candidates, acknowledge warnings, and approve results. Manual design tools should be fallback, constrained-correction, and expert-override paths rather than the default workflow.
+
+See the long-term [`ROADMAP.md`](ROADMAP.md).
+
 ## Current Version: v0.0.5
 
 Version `v0.0.5` implements and verifies:
@@ -58,12 +66,17 @@ See:
 
 ## Planned Next Workflow Stage
 
-The next production stage has not been accepted yet. Crown-bottom, cement-gap, anatomy, contact-adjustment, and export behavior remain outside v0.0.5 and require a separately approved PRD, decisions, plan, tasks, and verification matrix before implementation.
+The proposed next release is **v0.0.6 — Step 5: Automated Preparation Die & Crown Bottom**.
+
+Its primary objective is to generate the preparation die, insertion-axis-aware undercut blockout, crown-bottom surface, margin seal, and cement-space geometry automatically. Manual editing should be limited to constrained corrections and explicit overrides.
+
+The exact production scope still requires a separately approved PRD, decisions, implementation plan, tasks, and verification matrix.
 
 ## Repository Structure
 
 ```text
 b-dental/
+├── ROADMAP.md
 ├── docs/
 │   ├── v0.0.1/
 │   ├── v0.0.2/
@@ -105,6 +118,8 @@ b-dental/
 ## Development Rules
 
 - Every version must have an explicit scope.
+- Automation is the primary workflow whenever a safe, measurable, and reproducible automated solution is feasible.
+- Manual tools are fallback, constrained-correction, debugging, and expert-override paths rather than the product's default design workflow.
 - Registration must not modify the user's scene.
 - Destructive actions must be explicit and narrowly scoped.
 - Dental workflow state and Blender operator results must remain separate.
