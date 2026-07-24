@@ -21,6 +21,7 @@ files = "Import intra-oral STL scans selected by the user"
 paths = [
   "__init__.py",
   "alignment.py",
+  "antagonist_region.py",
   "margin_geometry.py",
   "margin_overlay.py",
   "margin_validation.py",
