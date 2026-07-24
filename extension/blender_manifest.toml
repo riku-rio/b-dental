@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
 
 id = "b_dental"
-version = "0.0.4"
+version = "0.0.5"
 name = "B-Dental"
-tagline = "Import scans, verify occlusion, and define a manual crown margin"
+tagline = "Define restorations, insertion axes, and preparation undercut analysis"
 maintainer = "riku-rio"
 type = "add-on"
 website = "https://github.com/riku-rio/b-dental"
@@ -22,14 +22,20 @@ paths = [
   "__init__.py",
   "alignment.py",
   "antagonist_region.py",
+  "axis_geometry.py",
+  "axis_overlay.py",
   "margin_geometry.py",
   "margin_overlay.py",
   "margin_validation.py",
   "occlusion_validation.py",
   "operators.py",
+  "preparation_analysis.py",
   "properties.py",
   "restoration_utils.py",
   "scene_utils.py",
+  "step_four_operators.py",
+  "step_four_session.py",
+  "step_four_validation.py",
   "step_three_operators.py",
   "step_three_session.py",
   "step_two_operators.py",
