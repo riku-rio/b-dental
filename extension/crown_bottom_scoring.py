@@ -10,17 +10,13 @@ from typing import Sequence
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
-from .crown_bottom_geometry import (
-    MeshGeometry,
-    resample_closed_polyline,
-    topology_metrics,
-)
+from .crown_bottom_geometry import MeshGeometry, topology_metrics
 from .preparation_die import BlockoutResult
 from .preparation_region import PreparationPatch
 from .relief_field import ReliefResult
 from .seal_band import SealBandResult
 
-SCORING_POLICY_VERSION = 2
+SCORING_POLICY_VERSION = 3
 MAX_MARGIN_DEVIATION = 0.00035
 MAX_RESIDUAL_BLOCKING_DEPTH = 0.00003
 MAX_SELF_INTERSECTIONS = 0
@@ -92,24 +88,37 @@ def deserialize_metrics(value: str) -> CandidateMetrics | None:
         return None
 
 
-def _triangulate_faces(
+def _triangulate_faces_with_owners(
     faces: Sequence[Sequence[int]],
-) -> tuple[tuple[int, int, int], ...]:
-    triangles: list[tuple[int, int, int]] = []
-    for face in faces:
+) -> tuple[tuple[tuple[int, int, int], int], ...]:
+    triangles: list[tuple[tuple[int, int, int], int]] = []
+    for face_index, face in enumerate(faces):
         if len(face) < 3:
             continue
         for index in range(1, len(face) - 1):
             triangles.append(
-                (int(face[0]), int(face[index]), int(face[index + 1]))
+                (
+                    (
+                        int(face[0]),
+                        int(face[index]),
+                        int(face[index + 1]),
+                    ),
+                    face_index,
+                )
             )
     return tuple(triangles)
 
 
-def _self_intersection_count(geometry: MeshGeometry) -> int:
-    triangles = _triangulate_faces(geometry.faces)
-    if not triangles:
+def _self_intersection_count(
+    geometry: MeshGeometry,
+    source_face_count: int,
+) -> int:
+    owned_triangles = _triangulate_faces_with_owners(geometry.faces)
+    if not owned_triangles:
         return 0
+
+    triangles = tuple(item[0] for item in owned_triangles)
+    owners = tuple(item[1] for item in owned_triangles)
     tree = BVHTree.FromPolygons(
         geometry.vertices,
         triangles,
@@ -121,10 +130,17 @@ def _self_intersection_count(geometry: MeshGeometry) -> int:
     for left_index, right_index in overlaps:
         if left_index >= right_index:
             continue
+
+        left_face = owners[left_index]
+        right_face = owners[right_index]
+        if left_face < source_face_count and right_face < source_face_count:
+            continue
+
         left = set(triangles[left_index])
         right = set(triangles[right_index])
         if left & right:
             continue
+
         count += 1
         if count >= MAX_OVERLAP_PAIRS:
             break
@@ -149,12 +165,14 @@ def _face_normal(
 def _smoothness_error(geometry: MeshGeometry) -> float:
     edge_faces: dict[tuple[int, int], list[int]] = {}
     normals = [
-        _face_normal(geometry.vertices, face) for face in geometry.faces
+        _face_normal(geometry.vertices, face)
+        for face in geometry.faces
     ]
     for face_index, face in enumerate(geometry.faces):
         for left, right in zip(face, (*face[1:], face[0])):
             edge = (left, right) if left < right else (right, left)
             edge_faces.setdefault(edge, []).append(face_index)
+
     errors: list[float] = []
     for owners in edge_faces.values():
         if len(owners) != 2:
@@ -170,18 +188,20 @@ def _smoothness_error(geometry: MeshGeometry) -> float:
 
 def _margin_deviations(
     geometry: MeshGeometry,
-    margin_world: tuple[Vector, ...],
-    outer_loop: tuple[int, ...],
+    seal: SealBandResult,
 ) -> tuple[float, float, float]:
-    if not outer_loop:
+    if (
+        not seal.outer_loop
+        or len(seal.outer_loop) != len(seal.margin_samples)
+    ):
         return float("inf"), float("inf"), 0.0
-    margin_samples = resample_closed_polyline(
-        margin_world,
-        len(outer_loop),
-    )
+
     distances = [
-        (geometry.vertices[vertex_index] - margin_samples[index]).length
-        for index, vertex_index in enumerate(outer_loop)
+        (
+            geometry.vertices[vertex_index]
+            - seal.margin_samples[index]
+        ).length
+        for index, vertex_index in enumerate(seal.outer_loop)
     ]
     coverage = (
         sum(1 for distance in distances if math.isfinite(distance))
@@ -198,8 +218,6 @@ def _generated_minimum_feature_size(
     geometry: MeshGeometry,
     seal: SealBandResult,
 ) -> float:
-    """Measure only Step 5-created seal geometry, not source STL tessellation."""
-
     lengths: list[float] = []
     for loop in (seal.outer_loop, seal.inner_loop):
         for left, right in zip(loop, (*loop[1:], loop[0])):
@@ -234,10 +252,12 @@ def evaluate_candidate(
     topology = topology_metrics(geometry)
     mean_margin, max_margin, coverage = _margin_deviations(
         geometry,
-        patch.margin_world,
-        seal.outer_loop,
+        seal,
     )
-    self_intersections = _self_intersection_count(geometry)
+    self_intersections = _self_intersection_count(
+        geometry,
+        len(patch.geometry.faces),
+    )
     smoothness = _smoothness_error(geometry)
     generated_minimum_feature = _generated_minimum_feature_size(
         geometry,
@@ -267,8 +287,8 @@ def evaluate_candidate(
         )
     if self_intersections > MAX_SELF_INTERSECTIONS:
         reasons.append(
-            f"The candidate contains {self_intersections} non-adjacent "
-            "self-intersection pair(s)."
+            f"The candidate contains {self_intersections} Step 5-created "
+            "non-adjacent self-intersection pair(s)."
         )
     if topology.boundary_loop_count != 1:
         reasons.append(
