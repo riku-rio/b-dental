@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
 
 id = "b_dental"
-version = "0.0.5"
+version = "0.0.6"
 name = "B-Dental"
-tagline = "Define insertion axes and analyze preparation undercuts"
+tagline = "Generate preparation dies and crown-bottom candidates"
 maintainer = "riku-rio"
 type = "add-on"
 website = "https://github.com/riku-rio/b-dental"
@@ -24,15 +24,26 @@ paths = [
   "antagonist_region.py",
   "axis_geometry.py",
   "axis_overlay.py",
+  "crown_bottom_candidates.py",
+  "crown_bottom_geometry.py",
+  "crown_bottom_overlay.py",
+  "crown_bottom_scoring.py",
   "margin_geometry.py",
   "margin_overlay.py",
   "margin_validation.py",
   "occlusion_validation.py",
   "operators.py",
   "preparation_analysis.py",
+  "preparation_die.py",
+  "preparation_region.py",
   "properties.py",
+  "relief_field.py",
   "restoration_utils.py",
   "scene_utils.py",
+  "seal_band.py",
+  "step_five_operators.py",
+  "step_five_session.py",
+  "step_five_validation.py",
   "step_four_operators.py",
   "step_four_session.py",
   "step_four_validation.py",
