@@ -3,7 +3,8 @@
 ## Metadata
 
 - **Version:** v0.0.5
-- **Status:** Accepted
+- **Status:** Accepted and Implemented
+- **Verification:** Passed locally
 - **Related requirements:** [`../PRD.md`](../PRD.md)
 - **Related plan:** [`../plans/0001-preparation-analysis-insertion-axis.md`](../plans/0001-preparation-analysis-insertion-axis.md)
 
@@ -41,6 +42,12 @@ A normalized target-local vector is compact, deterministic, serializable, indepe
 
 - Direction conversion helpers are required.
 - Every material change must renormalize and validate the vector.
-- Axis-object recovery must reconstruct orientation from stored state.
-- Approval signatures must include the normalized vector.
+- Axis-object recovery reconstructs orientation from stored state.
+- Approval signatures include the normalized vector.
 - Future stages may consume the axis without depending on the viewport artifact.
+
+## Implementation and Verification Record
+
+Implemented in `axis_geometry.py`, `step_four_session.py`, and `step_four_validation.py`.
+
+Local verification confirmed finite normalized storage, current-view conversion, managed-object positive-Z alignment, persistence, pointer recovery, stale-state invalidation, and independent per-restoration approval. World-space undercut analysis consumes a converted copy of the target-local axis without changing the authoritative representation.
