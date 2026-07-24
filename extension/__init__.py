@@ -6,13 +6,19 @@ from bpy.props import PointerProperty
 
 from . import (
     antagonist_region,
+    axis_geometry,
+    axis_overlay,
     margin_geometry,
     margin_overlay,
     margin_validation,
     operators,
+    preparation_analysis,
     properties,
     restoration_utils,
     scene_utils,
+    step_four_operators,
+    step_four_session,
+    step_four_validation,
     step_three_operators,
     step_three_session,
     step_two_operators,
@@ -25,6 +31,7 @@ CLASSES = (
     + operators.CLASSES
     + step_two_operators.CLASSES
     + step_three_operators.CLASSES
+    + step_four_operators.CLASSES
     + antagonist_region.CLASSES
     + ui.CLASSES
 )
@@ -45,6 +52,11 @@ def _reset_workflow_state_with_dependencies(state) -> None:
     try:
         properties.clear_step_two_state(state)
         properties.clear_step_three_state(state)
+        state.step_4_status = "NOT_STARTED"
+        state.step_4_valid = False
+        state.step_4_summary = ""
+        state.step_4_errors = ""
+        state.step_4_warnings = ""
     finally:
         state.internal_update_lock = False
 
@@ -69,8 +81,9 @@ scene_utils.matrix_from_string = step_two_session.matrix_from_string
 
 
 @persistent
-def _monitor_step_three_dependencies(scene, _depsgraph) -> None:
+def _monitor_workflow_dependencies(scene, _depsgraph) -> None:
     step_three_session.monitor_scene(scene)
+    step_four_session.monitor_scene(scene)
 
 
 def register() -> None:
@@ -82,17 +95,19 @@ def register() -> None:
     bpy.types.Scene.bdental_workflow = PointerProperty(
         type=properties.BDENTAL_PG_WorkflowState
     )
-    if _monitor_step_three_dependencies not in bpy.app.handlers.depsgraph_update_post:
-        bpy.app.handlers.depsgraph_update_post.append(_monitor_step_three_dependencies)
+    if _monitor_workflow_dependencies not in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.append(_monitor_workflow_dependencies)
     margin_overlay.register()
+    axis_overlay.register()
 
 
 def unregister() -> None:
     """Remove scene state and unregister B-Dental classes in reverse order."""
 
+    axis_overlay.unregister()
     margin_overlay.unregister()
-    if _monitor_step_three_dependencies in bpy.app.handlers.depsgraph_update_post:
-        bpy.app.handlers.depsgraph_update_post.remove(_monitor_step_three_dependencies)
+    if _monitor_workflow_dependencies in bpy.app.handlers.depsgraph_update_post:
+        bpy.app.handlers.depsgraph_update_post.remove(_monitor_workflow_dependencies)
     if hasattr(bpy.types.Scene, "bdental_workflow"):
         del bpy.types.Scene.bdental_workflow
 
