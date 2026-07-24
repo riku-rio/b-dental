@@ -4,52 +4,61 @@ B-Dental is a custom Blender Extension for building a structured digital dental 
 
 The project is developed through small, verifiable releases. Each release defines requirements, architectural decisions, an implementation plan, a task checklist, and a local verification record before the next workflow stage begins.
 
-## Current Version: v0.0.4
+## Current Version: v0.0.5
 
-Version `v0.0.4` implements and verifies:
+Version `v0.0.5` implements and verifies:
 
-**Step 3 — Multiple Restorations, Manual Margins & Antagonist Regions**
+**Step 4 — Preparation Analysis & Insertion Axis**
 
 The extension now supports:
 
-- Multiple independent single-unit anatomical crown restorations in one case.
-- Upper- and lower-arch restorations when the required scans are available.
-- Permanent FDI tooth identifiers with duplicate-target rejection.
-- One managed, target-local, closed manual-margin Curve per restoration.
-- Clearly visible margin display and an always-visible viewport overlay.
-- Reversible drawing and editing sessions with reset, cancel, capture, and apply behavior.
-- Per-restoration validation, diagnostics, warnings, review confirmation, and approval.
-- Per-restoration antagonist-region definition using automatic detection or manual picking.
-- Antagonist-region review, persistence, ownership, invalidation, visibility, and cleanup.
-- Aggregate Step 3 completion only when every configured restoration is approved.
-- Safe migration from v0.0.3 and earlier in-branch v0.0.4 state.
-- Safe invalidation when upstream scans, transforms, margins, or antagonist regions materially change.
+- Independent Step 4 state and approval for every restoration created in Step 3.
+- One authoritative finite normalized insertion axis stored in preparation-scan local coordinates.
+- Axis candidates captured from the current 3D View.
+- A non-authoritative margin-normal axis suggestion.
+- One managed, target-parented axis object per restoration for interaction and display.
+- Reversible axis-edit sessions with Start, Reset, Cancel, Capture, and Apply behavior.
+- A margin-derived preparation-analysis neighborhood with an adjustable `2 mm` to `15 mm` radius.
+- Deterministic, bounded, non-destructive evaluated-mesh sampling.
+- World-space undercut ray analysis using the removal direction opposite the stored seating axis.
+- Per-restoration sample count, undercut count, ratio, mean depth, maximum depth, and runtime metrics.
+- A viewport overlay that distinguishes clear and undercut samples without modifying imported mesh data.
+- Independent validation, engineering warnings, visual review, warning acknowledgment, and explicit approval.
+- Aggregate Step 4 completion only when every restoration is independently approved.
+- Safe invalidation after target, margin, antagonist, axis, radius, analysis, or upstream changes.
+- Safe migration from v0.0.4 with empty Step 4 defaults and no automatically created Step 4 artifacts.
 
 ## Project Status
 
-Version `v0.0.4` is implemented and locally verified on branch:
+Version `v0.0.5` is implemented and locally verified on branch:
 
-`feat/v0.0.4-restoration-setup-manual-margin-definition`
+`feat/v0.0.5-preparation-analysis-insertion-axis`
 
-The extension manifest is versioned as `0.0.4`. Package validation, ZIP build and inspection, installation, lifecycle checks, migration checks, Step 1 and Step 2 regressions, and the Step 3 scenario matrix were completed before preparing the release pull request.
+The extension manifest is versioned as `0.0.5`. Manifest validation, ZIP build and inspection, install-from-disk, enablement, lifecycle checks, v0.0.4 migration, Step 1–3 regressions, the complete Step 4 scenario matrix, persistence, invalidation, cleanup, UI, performance, and scan-safety checks were completed before preparing the release pull request.
+
+Two defects found during local verification were corrected before acceptance:
+
+- The extension tagline exceeded Blender's 64-character manifest limit.
+- Preparation samples were initially compared in target-local coordinates against a world-unit radius; sampling and BVH analysis now run in world space and stored overlay samples remain target-local.
 
 See:
 
-- [`docs/v0.0.4/PRD.md`](docs/v0.0.4/PRD.md)
-- [`docs/v0.0.4/plans/0001-restoration-setup-manual-margin-definition.md`](docs/v0.0.4/plans/0001-restoration-setup-manual-margin-definition.md)
-- [`docs/v0.0.4/TASKS.md`](docs/v0.0.4/TASKS.md)
-- [`docs/v0.0.4/VERIFICATION.md`](docs/v0.0.4/VERIFICATION.md)
-- [`docs/v0.0.4/decisions/`](docs/v0.0.4/decisions/)
+- [`docs/v0.0.5/PRD.md`](docs/v0.0.5/PRD.md)
+- [`docs/v0.0.5/plans/0001-preparation-analysis-insertion-axis.md`](docs/v0.0.5/plans/0001-preparation-analysis-insertion-axis.md)
+- [`docs/v0.0.5/TASKS.md`](docs/v0.0.5/TASKS.md)
+- [`docs/v0.0.5/VERIFICATION.md`](docs/v0.0.5/VERIFICATION.md)
+- [`docs/v0.0.5/decisions/`](docs/v0.0.5/decisions/)
 
 ## Previous Versions
 
+- `v0.0.4` — Step 3: Multiple Restorations, Manual Margins & Antagonist Regions.
 - `v0.0.3` — Step 2: Occlusion Registration & Verification.
 - `v0.0.2` — Step 1: Import Intra-Oral Scans.
 - `v0.0.1` — Blender Extension foundation.
 
 ## Planned Next Workflow Stage
 
-The next release is planned as `v0.0.5` and will define **Step 4**. Its exact production scope must be approved in a new PRD, decisions, plan, tasks, and verification matrix before implementation begins.
+The next production stage has not been accepted yet. Crown-bottom, cement-gap, anatomy, contact-adjustment, and export behavior remain outside v0.0.5 and require a separately approved PRD, decisions, plan, tasks, and verification matrix before implementation.
 
 ## Repository Structure
 
@@ -59,7 +68,8 @@ b-dental/
 │   ├── v0.0.1/
 │   ├── v0.0.2/
 │   ├── v0.0.3/
-│   └── v0.0.4/
+│   ├── v0.0.4/
+│   └── v0.0.5/
 │       ├── decisions/
 │       ├── plans/
 │       ├── PRD.md
@@ -69,15 +79,21 @@ b-dental/
     ├── __init__.py
     ├── alignment.py
     ├── antagonist_region.py
+    ├── axis_geometry.py
+    ├── axis_overlay.py
     ├── blender_manifest.toml
     ├── margin_geometry.py
     ├── margin_overlay.py
     ├── margin_validation.py
     ├── occlusion_validation.py
     ├── operators.py
+    ├── preparation_analysis.py
     ├── properties.py
     ├── restoration_utils.py
     ├── scene_utils.py
+    ├── step_four_operators.py
+    ├── step_four_session.py
+    ├── step_four_validation.py
     ├── step_three_operators.py
     ├── step_three_session.py
     ├── step_two_operators.py
