@@ -3,7 +3,8 @@
 ## Metadata
 
 - **Version:** v0.0.5
-- **Status:** Accepted
+- **Status:** Accepted and Implemented
+- **Verification:** Passed locally
 - **Related requirements:** [`../PRD.md`](../PRD.md)
 - **Related plan:** [`../plans/0001-preparation-analysis-insertion-axis.md`](../plans/0001-preparation-analysis-insertion-axis.md)
 
@@ -21,9 +22,9 @@ Later crown-bottom stages need a clear contract that distinguishes a candidate, 
 - Approval requires a finite normalized axis, current analysis, valid dependency signatures, no blocking errors, explicit visual review, and warning acknowledgment when warnings exist.
 - Approval is independent per restoration.
 - Approval stores the axis vector, source, analysis settings, metrics, and target, margin, antagonist, upstream, and result signatures.
-- Material changes to upstream state, axis, radius, managed artifacts, or analysis invalidate approval.
+- Material changes to upstream state, axis, radius, managed artifacts, sampling policy, or analysis invalidate approval.
 - Aggregate Step 4 validity becomes true only when every restoration is independently approved.
-- UI and stored summaries must state that engineering validation does not certify clinical correctness.
+- UI and stored summaries state that engineering validation does not certify clinical correctness.
 
 ## Rationale
 
@@ -39,9 +40,15 @@ Separating candidate creation, analysis, validation, and approval prevents false
 
 ## Consequences
 
-- Step 4 requires candidate, analyzed, and verified statuses.
-- Validation and approval operators must remain separate.
+- Step 4 has candidate, analyzed, and verified statuses.
+- Validation and approval operators remain separate.
 - Review and warning acknowledgment clear after material changes.
 - Per-restoration and aggregate validity synchronization is required.
 - Later stages may depend on `step_4_valid`, not merely the presence of an axis or metrics.
-- Verification must test stale-result rejection and independent aggregate completion.
+- Verification tests stale-result rejection and independent aggregate completion.
+
+## Implementation and Verification Record
+
+Implemented in `step_four_validation.py`, `step_four_operators.py`, `step_four_session.py`, and the Step 4 UI.
+
+Local verification confirmed that missing or stale axis and analysis state blocks approval, validation and analysis do not approve automatically, visual review is required, warnings require acknowledgment, each restoration approves independently, and aggregate Step 4 validity becomes true only after the final restoration is verified.
