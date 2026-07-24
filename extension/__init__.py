@@ -80,10 +80,31 @@ scene_utils.has_destructive_reset_content = _has_destructive_case_content
 scene_utils.matrix_from_string = step_two_session.matrix_from_string
 
 
+def _monitor_axis_artifacts(state) -> None:
+    if not state.step_3_valid:
+        return
+    for restoration in state.restorations:
+        if restoration.axis_session_active or not restoration.insertion_axis_local:
+            continue
+        obj = axis_geometry.resolve_axis(restoration)
+        if obj is None:
+            step_four_session.invalidate_restoration(restoration, preserve_axis=True)
+            restoration.step_4_status = "ERROR"
+            restoration.step_4_summary = "The managed insertion-axis artifact is missing. Recreate the axis candidate."
+            continue
+        if not axis_geometry.axis_object_matches(restoration):
+            step_four_session.invalidate_restoration(restoration, preserve_axis=True)
+            restoration.step_4_status = "ERROR"
+            restoration.step_4_summary = "The managed insertion axis changed outside its reversible edit session. Recreate or edit the candidate."
+    step_four_session.sync_step_four_state(state)
+
+
 @persistent
 def _monitor_workflow_dependencies(scene, _depsgraph) -> None:
     step_three_session.monitor_scene(scene)
     step_four_session.monitor_scene(scene)
+    if hasattr(scene, "bdental_workflow"):
+        _monitor_axis_artifacts(scene.bdental_workflow)
 
 
 def register() -> None:
