@@ -25,7 +25,10 @@ class BDENTAL_OT_select_step_five_restoration(bpy.types.Operator):
         state = context.scene.bdental_workflow
         active = restoration_utils.active_restoration(state)
         if active is not None and active.step_5_correction_active:
-            self.report({"ERROR"}, "Apply or cancel the active Step 5 correction session before switching.")
+            self.report(
+                {"ERROR"},
+                "Apply or cancel the active Step 5 correction session before switching.",
+            )
             return {"CANCELLED"}
         if self.index >= len(state.restorations):
             return {"CANCELLED"}
@@ -42,7 +45,9 @@ def _patch_step_five_draw() -> None:
 
     def draw(layout, state, context):
         box = layout.box()
-        approved = sum(1 for restoration in state.restorations if restoration.step_5_valid)
+        approved = sum(
+            1 for restoration in state.restorations if restoration.step_5_valid
+        )
         box.label(
             text=f"Restorations | Approved {approved} of {len(state.restorations)}",
             icon="OUTLINER_COLLECTION",
@@ -62,6 +67,26 @@ def _patch_step_five_draw() -> None:
     step_five_operators._draw_step_five = draw
 
 
+def _selection_execute_wrapper(original_execute):
+    """Return a Blender-compatible two-argument execute wrapper."""
+
+    def execute(self, context):
+        active = restoration_utils.active_restoration(
+            context.scene.bdental_workflow
+        )
+        if active is not None and getattr(
+            active, "step_5_correction_active", False
+        ):
+            self.report(
+                {"ERROR"},
+                "Apply or cancel the active Step 5 correction session before switching.",
+            )
+            return {"CANCELLED"}
+        return original_execute(self, context)
+
+    return execute
+
+
 def _patch_upstream_selection() -> None:
     for operator in (
         step_three_operators.BDENTAL_OT_select_restoration,
@@ -71,15 +96,7 @@ def _patch_upstream_selection() -> None:
             continue
         original = operator.execute
         operator._bdental_step_five_original_execute = original
-
-        def execute(self, context, _original=original):
-            active = restoration_utils.active_restoration(context.scene.bdental_workflow)
-            if active is not None and getattr(active, "step_5_correction_active", False):
-                self.report({"ERROR"}, "Apply or cancel the active Step 5 correction session before switching.")
-                return {"CANCELLED"}
-            return _original(self, context)
-
-        operator.execute = execute
+        operator.execute = _selection_execute_wrapper(original)
 
 
 def _patch_restoration_removal() -> None:
@@ -93,10 +110,17 @@ def _patch_restoration_removal() -> None:
         state = context.scene.bdental_workflow
         restoration = restoration_utils.active_restoration(state)
         if restoration is not None and restoration.step_5_correction_active:
-            self.report({"ERROR"}, "Cancel the active Step 5 correction session before removing this restoration.")
+            self.report(
+                {"ERROR"},
+                "Cancel the active Step 5 correction session before removing this restoration.",
+            )
             return {"CANCELLED"}
         artifacts = (
-            list(crown_bottom_candidates.iter_managed_artifacts(context.scene, restoration))
+            list(
+                crown_bottom_candidates.iter_managed_artifacts(
+                    context.scene, restoration
+                )
+            )
             if restoration is not None
             else []
         )
