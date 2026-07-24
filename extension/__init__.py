@@ -6,6 +6,7 @@ from bpy.props import PointerProperty
 
 from . import (
     margin_geometry,
+    margin_overlay,
     margin_validation,
     operators,
     properties,
@@ -81,14 +82,15 @@ def register() -> None:
     )
     if _monitor_step_three_dependencies not in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.append(_monitor_step_three_dependencies)
+    margin_overlay.register()
 
 
 def unregister() -> None:
     """Remove scene state and unregister B-Dental classes in reverse order."""
 
+    margin_overlay.unregister()
     if _monitor_step_three_dependencies in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.remove(_monitor_step_three_dependencies)
-
     if hasattr(bpy.types.Scene, "bdental_workflow"):
         del bpy.types.Scene.bdental_workflow
 
