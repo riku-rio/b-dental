@@ -16,11 +16,12 @@ from .preparation_region import PreparationPatch
 from .relief_field import ReliefResult
 from .seal_band import SealBandResult
 
-SCORING_POLICY_VERSION = 3
+SCORING_POLICY_VERSION = 4
 MAX_MARGIN_DEVIATION = 0.00035
 MAX_RESIDUAL_BLOCKING_DEPTH = 0.00003
 MAX_SELF_INTERSECTIONS = 0
 MIN_LOCAL_FEATURE_SIZE = 0.00002
+FEATURE_SIZE_EPSILON = 1.0e-9
 MAX_OVERLAP_PAIRS = 100000
 
 
@@ -218,17 +219,13 @@ def _generated_minimum_feature_size(
     geometry: MeshGeometry,
     seal: SealBandResult,
 ) -> float:
-    lengths: list[float] = []
-    for loop in (seal.outer_loop, seal.inner_loop):
-        for left, right in zip(loop, (*loop[1:], loop[0])):
-            lengths.append(
-                (geometry.vertices[right] - geometry.vertices[left]).length
-            )
-    for outer, inner in zip(seal.outer_loop, seal.inner_loop):
-        lengths.append(
-            (geometry.vertices[outer] - geometry.vertices[inner]).length
-        )
-    return float(min(lengths, default=0.0))
+    """Measure the generated band span, not source or margin tessellation."""
+
+    widths = [
+        (geometry.vertices[outer] - geometry.vertices[inner]).length
+        for outer, inner in zip(seal.outer_loop, seal.inner_loop)
+    ]
+    return float(min(widths, default=0.0))
 
 
 def _normalized_good(value: float, limit: float) -> float:
@@ -307,7 +304,8 @@ def evaluate_candidate(
         )
     if (
         generated_minimum_feature
-        and generated_minimum_feature < MIN_LOCAL_FEATURE_SIZE
+        and generated_minimum_feature + FEATURE_SIZE_EPSILON
+        < MIN_LOCAL_FEATURE_SIZE
     ):
         reasons.append(
             f"Minimum generated local feature size is "
