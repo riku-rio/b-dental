@@ -3,13 +3,14 @@
 ## Metadata
 
 - **Version:** v0.0.5
-- **Status:** Accepted
+- **Status:** Accepted and Implemented
+- **Verification:** Passed locally
 - **Related requirements:** [`../PRD.md`](../PRD.md)
 - **Related plan:** [`../plans/0001-preparation-analysis-insertion-axis.md`](../plans/0001-preparation-analysis-insertion-axis.md)
 
 ## Context
 
-Insertion-axis definition may involve repeated viewport capture, manual rotation, reset, cancellation, and comparison against undercut results. Editing an approved axis directly would risk losing the last accepted state and would make restoration switching and save/reopen behavior ambiguous.
+Insertion-axis definition may involve repeated viewport capture, manual rotation, reset, cancellation, and comparison against undercut results. Editing an approved axis directly would risk losing the last accepted state and make restoration switching and save/reopen behavior ambiguous.
 
 Blender Undo alone is not sufficient because workflow status, analysis metrics, approval signatures, and managed-artifact ownership must be restored together.
 
@@ -27,20 +28,26 @@ Blender Undo alone is not sufficient because workflow status, analysis metrics, 
 
 ## Rationale
 
-A snapshot-based session model follows the safety contracts already established in Steps 2 and 3. It protects approved work, keeps user intent explicit, and makes rollback deterministic and testable.
+A snapshot-based session model follows the safety contracts established in Steps 2 and 3. It protects approved work, keeps intent explicit, and makes rollback deterministic and testable.
 
 ## Rejected Alternatives
 
 - **Edit approved axis directly:** rejected because cancellation cannot reliably restore the accepted state.
 - **Depend only on Blender Undo:** rejected because workflow and approval state extend beyond object transforms.
 - **Auto-apply when leaving Step 4:** rejected because navigation must not silently accept a candidate.
-- **Auto-run analysis after every rotation event:** rejected because it may be expensive and obscures when a result becomes authoritative.
+- **Auto-run analysis after every rotation event:** rejected because it may be expensive and obscures result authority.
 - **Duplicate permanent axis objects for every candidate:** rejected because ownership and cleanup would become error-prone.
 
 ## Consequences
 
 - Per-restoration session snapshots are required.
-- Axis operators must share one session contract.
+- Axis operators share one session contract.
 - Applying or changing an axis clears stale analysis.
-- UI must expose Start, Reset, Cancel, Capture, and Apply actions clearly.
-- Verification must cover new-axis and existing-approved-axis rollback independently.
+- UI exposes Start, Reset, Cancel, Capture, and Apply actions.
+- Verification covers new-axis and approved-axis rollback independently.
+
+## Implementation and Verification Record
+
+Implemented in `step_four_session.py` and exposed through `step_four_operators.py` and the Step 4 UI.
+
+Local verification confirmed exact Reset, exact Cancel, draft-artifact cleanup, Capture and Apply behavior, stale-analysis clearing, no automatic approval, navigation and restoration-switch gating, save/reopen safety, and preservation of inactive restorations.
